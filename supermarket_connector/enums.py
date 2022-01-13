@@ -17,6 +17,7 @@ class ProductAvailabilityStatus(Enum):
     IN_ASSORTMENT = auto()
     FUTURE_ASSORTMENT = auto()
     NOT_IN_ASSORTMENT = auto()
+    UNAVAILABLE = auto()
     UNKNOWN = auto()
 
 
@@ -52,4 +53,10 @@ class BonusType(Enum):
     GALL = auto()
     PERPETUAL = auto()
     GALLCARD = auto()
+    UNKNOWN = auto()
+
+
+class ProductType(Enum):
+    PRODUCT = auto()
+    RETAILSET = auto()
     UNKNOWN = auto()
