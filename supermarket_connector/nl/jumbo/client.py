@@ -1,20 +1,19 @@
 from __future__ import annotations
 
 import json
-from math import ceil
+import math
 import os
-from datetime import date
-from tempfile import gettempdir
+import tempfile
 from typing import Any, Optional, Union
 
 import requests
 from requests.models import Response
-from supermarket_connector.enums import BonusType, DiscountType, ProductAvailabilityStatus, SegmentType, ShopType
 from supermarket_connector.models.category import Category
 from supermarket_connector.models.image import Image
 from supermarket_connector.models.product import Product
-from supermarket_connector.nl.jumbo import errors
-from supermarket_connector.utils import process_type, type_def_dict
+
+# from supermarket_connector.nl.jumbo import errors
+from supermarket_connector import utils
 
 from unidecode import unidecode
 
@@ -22,7 +21,7 @@ from unidecode import unidecode
 class Client:
     BASE_URL = "https://mobileapi.jumbo.com/"
     DEFAULT_HEADERS = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:81.0) Gecko/20100101 Firefox/81.0"}
-    TEMP_DIR = os.path.join(gettempdir(), "Supermarket-Connector", "Debug", "JUMBO")
+    TEMP_DIR = os.path.join(tempfile.gettempdir(), "Supermarket-Connector", "Debug", "JUMBO")
 
     def request(
         self,
@@ -63,10 +62,10 @@ class Client:
 
                         with open(debug_path, "w") as f:
                             if isinstance(response_json, list):
-                                data[end_point] = process_type(response_json, data[end_point], self.debug_value)
+                                data[end_point] = utils.process_type(response_json, data[end_point], self.debug_value)
                                 json.dump(data, f)
                             elif isinstance(response_json, dict):
-                                data[end_point] = type_def_dict(response_json, data[end_point], self.debug_value)
+                                data[end_point] = utils.type_def_dict(response_json, data[end_point], self.debug_value)
                                 json.dump(data, f)
                             else:
                                 print("Currently only list or dict format response supported")
@@ -131,8 +130,6 @@ class Client:
                     if not lookup is None:
                         return lookup
 
-                print("new")
-
                 for category in self.list():
                     lookup = category.lookup(name=name)
                     if not lookup is None:
@@ -162,7 +159,7 @@ class Client:
                         raise ValueError("Expected response to be dict")
 
                     if total_pages == 0:
-                        total_pages: int = ceil(response.get("products", {}).get("total", 30) / max_size)
+                        total_pages: int = math.ceil(response.get("products", {}).get("total", 30) / max_size)
 
                     for product in response.get("products", {}).get("data", []):
                         temp_ = self.__client.Product(self.__client, data=product)

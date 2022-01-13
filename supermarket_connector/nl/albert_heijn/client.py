@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 import os
 from datetime import date
-from tempfile import gettempdir
 from typing import Any, Optional, Union
+import tempfile
 
 import requests
 from requests.models import Response
@@ -13,7 +13,7 @@ from supermarket_connector.models.category import Category
 from supermarket_connector.models.image import Image
 from supermarket_connector.models.product import Product
 from supermarket_connector.nl.albert_heijn import errors
-from supermarket_connector.utils import process_type, type_def_dict
+from supermarket_connector import utils
 
 
 class Client:
@@ -22,7 +22,7 @@ class Client:
         "User-Agent": "android/6.29.3 Model/phone Android/7.0-API24",
         "Host": "ms.ah.nl",
     }
-    TEMP_DIR = os.path.join(gettempdir(), "Supermarket-Connector", "Debug", "AH")
+    TEMP_DIR = os.path.join(tempfile.gettempdir(), "Supermarket-Connector", "Debug", "AH")
     access_token: Optional[str] = None
 
     def get_anonymous_access_token(self) -> Optional[str]:
@@ -82,10 +82,10 @@ class Client:
 
                         with open(debug_path, "w") as f:
                             if isinstance(response_json, list):
-                                data[end_point] = process_type(response_json, data[end_point], self.debug_value)
+                                data[end_point] = utils.process_type(response_json, data[end_point], self.debug_value)
                                 json.dump(data, f)
                             elif isinstance(response_json, dict):
-                                data[end_point] = type_def_dict(response_json, data[end_point], self.debug_value)
+                                data[end_point] = utils.type_def_dict(response_json, data[end_point], self.debug_value)
                                 json.dump(data, f)
                             else:
                                 print("Currently only list or dict format response supported")
