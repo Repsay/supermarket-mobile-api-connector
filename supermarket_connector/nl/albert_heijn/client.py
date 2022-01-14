@@ -2,27 +2,27 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
+import tempfile
 from datetime import date
 from typing import Any, Optional, Union
-import tempfile
+import typing
 
 import requests
 from requests.models import Response
+from supermarket_connector import utils
 from supermarket_connector.enums import BonusType, DiscountType, ProductAvailabilityStatus, SegmentType, ShopType
 from supermarket_connector.models.category import Category
 from supermarket_connector.models.image import Image
 from supermarket_connector.models.product import Product
 from supermarket_connector.nl.albert_heijn import errors
-from supermarket_connector import utils
 
 
 class Client:
     BASE_URL = "https://ms.ah.nl/"
-    DEFAULT_HEADERS = {
-        "User-Agent": "android/6.29.3 Model/phone Android/7.0-API24",
-        "Host": "ms.ah.nl",
-    }
+    DEFAULT_HEADERS = {"User-Agent": "android/6.29.3 Model/phone Android/7.0-API24", "Host": "ms.ah.nl"}
     TEMP_DIR = os.path.join(tempfile.gettempdir(), "Supermarket-Connector", "Debug", "AH")
+
     access_token: Optional[str] = None
 
     def get_anonymous_access_token(self) -> Optional[str]:
@@ -34,15 +34,8 @@ class Client:
         self.access_token = response.get("access_token")
 
     def request(
-        self,
-        method: str,
-        end_point: str,
-        headers: dict[str, Any] = {},
-        params: dict[str, Any] = {},
-        timeout: int = 10,
-        authorized: bool = True,
-        json_: bool = True,
-    ) -> Union[str, Any]:
+        self, method: str, end_point: str, headers: dict[str, Any] = {}, params: dict[str, Any] = {}, timeout: int = 10, authorized: bool = True, json_: bool = True, debug_key: Optional[str] = None
+    ) -> Union[str, list[Any], dict[Any, Any]]:
 
         headers.update(self.DEFAULT_HEADERS)
 
@@ -51,18 +44,28 @@ class Client:
                 raise errors.AuthenticationError("Need token to make authorized requests")
             headers["Authorization"] = f"Bearer {self.access_token}"
 
-        response: Response = requests.request(method, f"{self.BASE_URL}{end_point}", params=params, headers=headers, timeout=timeout)
+        while True:
+            try:
+                response: Response = requests.request(method, f"{self.BASE_URL}{end_point}", params=params, headers=headers, timeout=timeout)
+            except Exception:
+                continue
+            else:
+                break
 
         if not response.ok:
             if response.status_code == 401:
                 self.get_anonymous_access_token()
-                if not self.access_token is None:
-                    return self.request(method, end_point, headers, params, timeout, authorized, json_)
+
+            if not self.access_token is None:
+                if self.debug:
+                    print(f"Connection error: {response.status_code}")
+                return self.request(method, end_point, headers, params, timeout, authorized, json_, debug_key)
+
             response.raise_for_status()
 
         if json_:
             try:
-                response_json = response.json()
+                response_json: Union[list[Any], dict[Any, Any]] = response.json()
 
                 if self.debug:
                     if self.debug_fn is None:
@@ -71,24 +74,36 @@ class Client:
                         print("Currently only json format is supported")
                     else:
                         debug_path = os.path.join(self.TEMP_DIR, self.debug_fn)
+                        debug_path_temp = os.path.join(self.TEMP_DIR, self.debug_fn.replace(".json", "_old.json"))
                         if os.path.isfile(debug_path):
                             with open(debug_path, "r") as f:
-                                data = json.load(f)
+                                try:
+                                    data: dict[str, Any] = json.load(f)
+                                    shutil.copyfile(debug_path, debug_path_temp)
+                                except ValueError:
+                                    data = {}
+                                    pass
                         else:
                             data = {}
 
-                        if not end_point in data.keys():
+                        if not debug_key in data.keys() and not debug_key is None:
+                            data[debug_key] = {}
+
+                        if not end_point in data.keys() and debug_key is None:
                             data[end_point] = {}
+
+                        if not debug_key is None:
+                            key = debug_key
+                        else:
+                            key = end_point
 
                         with open(debug_path, "w") as f:
                             if isinstance(response_json, list):
-                                data[end_point] = utils.process_type(response_json, data[end_point], self.debug_value)
-                                json.dump(data, f)
-                            elif isinstance(response_json, dict):
-                                data[end_point] = utils.type_def_dict(response_json, data[end_point], self.debug_value)
+                                data[key] = utils.process_type(response_json, data[key], self.debug_value)
                                 json.dump(data, f)
                             else:
-                                print("Currently only list or dict format response supported")
+                                data[key] = utils.type_def_dict(response_json, data[key], self.debug_value)
+                                json.dump(data, f)
 
                 return response_json
             except ValueError:
@@ -116,7 +131,7 @@ class Client:
     class Categories:
         def __init__(self, client: Client) -> None:
             self.__client = client
-            self.data: list[Client.Category] = []
+            self.data: dict[int, Client.Category] = {}
 
         def list(self):
             response = self.__client.request("GET", "mobile-services/v1/product-shelves/categories")
@@ -129,29 +144,28 @@ class Client:
                     raise ValueError("Expected dict")
                 category = self.__client.Category(self.__client, data=elem)
                 if not category is None:
-                    self.data.append(category)
+                    if not category.id in self.data.keys():
+                        self.data[category.id] = category
 
             return self.data
 
         def get(self, id: Optional[int] = None, name: Optional[str] = None):
             if not id is None:
-                for category in self.data:
-                    if category.id == id:
-                        return category
+                if id in self.data.keys():
+                    self.data[id]
 
-                for category in self.list():
-                    if category.id == id:
-                        return category
+                self.list()
+
+                if id in self.data.keys():
+                    self.data[id]
 
             elif not name is None:
-                for category in self.data:
+                for category in self.data.values():
                     lookup = category.lookup(name=name)
                     if not lookup is None:
                         return lookup
 
-                print("new")
-
-                for category in self.list():
+                for category in self.list().values():
                     lookup = category.lookup(name=name)
                     if not lookup is None:
                         return lookup
@@ -161,17 +175,33 @@ class Client:
     class Products:
         def __init__(self, client: Client) -> None:
             self.__client = client
-            self.data: list[Client.Product] = []
+            self.data: dict[int, dict[int, Client.Product]] = {}
+
+        @typing.overload
+        def list(self) -> dict[int, dict[int, Client.Product]]:
+            ...
+
+        @typing.overload
+        def list(self, category: Client.Category) -> dict[int, Client.Product]:
+            ...
 
         def list(self, category: Optional[Client.Category] = None):
             if category is None:
-                for category in self.__client.categories.list():
+                for category in self.__client.categories.list().values():
+                    if self.__client.debug_value:
+                        self.__client.debug_fn = f"product_{category.name}.json"
                     self.__client.products.list(category)
+                    print(category.name)
+
+                self.__client.debug_fn = "data.json"
                 return self.data
             else:
                 sub_category = False
                 total_pages = 0
                 page = 0
+
+                if self.data.get(category.id) is None:
+                    self.data[category.id] = {}
 
                 while True:
                     response = self.__client.request("GET", "mobile-services/product/search/v2", params={"page": page, "size": 1000, "query": None, "taxonomyId": category.id})
@@ -189,7 +219,8 @@ class Client:
                     for product in response.get("products", []):
                         temp_ = self.__client.Product(self.__client, data=product)
                         if not temp_ is None:
-                            self.data.append(temp_)
+                            if not temp_.id in self.data[category.id].keys():
+                                self.data[category.id][temp_.id] = temp_
 
                     page += 1
 
@@ -198,9 +229,11 @@ class Client:
 
                 if sub_category:
                     for sub_category in category.list_subs(False):
-                        self.list(sub_category)
+                        data = self.list(sub_category)
 
-                return self.data
+                        self.data[category.id].update(data)
+
+                return self.data[category.id]
 
     class Images:
         def __init__(self, client: Client) -> None:
@@ -222,6 +255,11 @@ class Client:
                 self.id = id
             elif not data is None:
                 images_data: list[dict[str, Any]] = data.get("images", [])
+                start_date_raw = data.get("bonusStartDate")
+                end_date_raw = data.get("bonusEndDate")
+                bonus_type_raw = data.get("promotionType")
+                discount_type_raw = data.get("discountType")
+                segment_type_raw = data.get("segmentType")
 
                 id = data.get("webshopId")
 
@@ -230,98 +268,202 @@ class Client:
 
                 self.id = id
                 self.name = data.get("title")
-                self.unit_size = data.get("salesUnitSize")
-                self.images = self.__client.images.process(images_data)
-                self.price_raw = data.get("priceBeforeBonus")
-                self.order_availability = ProductAvailabilityStatus[data.get("orderAvailabilityStatus", "UNKNOWN")]
-                # self.category = self.__client.categories.get(name=data.get("mainCategory"))
-                # self.subcategory = self.__client.categories.get(name=data.get("subCategory"))
-                self.category = data.get("mainCategory")
-                self.subcategory = data.get("subCategory")
                 self.brand = data.get("brand")
                 self.shop_type = ShopType[data.get("shopType", "UNKNOWN")]
-                self.available_online = data.get("availableOnline", False)
-                self.description_html = data.get("descriptionHighlights")
-                self.icons = data.get("propertyIcons")
+                self.category = data.get("mainCategory")
+                self.subcategory = data.get("subCategory")
                 self.nix18 = data.get("nix18", False)
-                self.stapel_bonus = data.get("isStapelBonus", False)
-                self.description_extra = data.get("extraDescriptions")
-                self.bonus = data.get("isBonus", False)
-                self.description = data.get("descriptionFull")
-                self.orderable = data.get("isOrderable", False)
-                self.bonus_infinite = data.get("isInfiniteBonus", False)
+                self.nutriscore = data.get("nutriscore")
                 self.sample = data.get("isSample", False)
                 self.sponsored = data.get("isSponsored", False)
-                self.bundle = data.get("isVirtualBundle", False)
+
+                self.images: list[Client.Image] = self.__client.images.process(images_data)
+                self.icons = data.get("propertyIcons", [])
+                self.stickers = data.get("stickers", [])
+
+                self.description = data.get("descriptionFull")
+                self.description_html = data.get("descriptionHighlights")
+                self.description_extra = data.get("extraDescriptions")
+
+                self.price_raw = data.get("priceBeforeBonus")
+                self.price_current = data.get("currentPrice")
                 self.unit_price_description = data.get("unitPriceDescription")
-                start_date_raw = data.get("bonusStartDate")
-                end_date_raw = data.get("bonusEndDate")
+
+                self.unit_size = data.get("salesUnitSize")
+
+                self.order_availability = ProductAvailabilityStatus[data.get("orderAvailabilityStatus", "UNKNOWN")]
+                self.order_availability_description = data.get("orderAvailabilityDescription")
+                self.available_online = data.get("availableOnline", False)
+                self.orderable = data.get("isOrderable", False)
+
+                self.bonus = data.get("isBonus", False)
+                self.bonus_price = data.get("isBonusPrice", False)
+                self.bonus_infinite = data.get("isInfiniteBonus", False)
                 self.bonus_start_date = date.fromisoformat(start_date_raw) if not start_date_raw is None else None
                 self.bonus_end_date = date.fromisoformat(end_date_raw) if not end_date_raw is None else None
-                discount_type_raw = data.get("discountType")
-                segment_type_raw = data.get("segmentType")
-                bonus_type_raw = data.get("promotionType")
-                self.discount_type = DiscountType[discount_type_raw] if not discount_type_raw is None else None
-                self.segment_type = SegmentType[segment_type_raw] if not segment_type_raw is None else None
                 self.bonus_type = BonusType[bonus_type_raw] if not bonus_type_raw is None else None
                 self.bonus_mechanism = data.get("bonusMechanism")
-                self.price_current = data.get("currentPrice")
                 self.bonus_period_description = data.get("bonusPeriodDescription")
+                self.stapel_bonus = data.get("isStapelBonus", False)
+                self.discount_type = DiscountType[discount_type_raw] if not discount_type_raw is None else None
+                self.segment_type = SegmentType[segment_type_raw] if not segment_type_raw is None else None
                 self.bonus_segment_id = data.get("bonusSegmentId")
                 self.bonus_segment_description = data.get("bonusSegmentDescription")
-                self.bonus_price = data.get("isBonusPrice", False)
-                self.nutriscore = data.get("nutriscore")
-                self.stickers = data.get("stickers")
-                self.bundle_items = data.get("virtualBundleItems")
-                self.order_availability_description = data.get("orderAvailabilityDescription")
+
+                self.bundle = data.get("isVirtualBundle", False)
+                self.bundle_items = data.get("virtualBundleItems", [])
+
             else:
                 raise ValueError("When initilizing category need to have data or id")
 
         def details(self):
-            response = self.__client.request("GET", f"mobile-services/product/detail/v4/fir/{self.id}")
+            response = self.__client.request("GET", f"mobile-services/product/detail/v4/fir/{self.id}", debug_key="product_details")
 
             if not isinstance(response, dict):
                 raise ValueError("Expected value to be dict")
 
             data: dict[str, Any] = response
             productCard = data.get("productCard", {})
-            self.subcategory_id: Optional[int] = productCard.get("subCategoryId")
+            self.subcategory_id = productCard.get("subCategoryId")
+            self.description_extra = "\n".join(productCard.get("extraDescriptions", []))
 
             properties = productCard.get("properties", {})
 
-            self.fragrance: list[str] = properties.get("da_fragrance", [])
-            self.taste: list[str] = properties.get("da_taste", [])
-            self.processing_type: list[str] = properties.get("da_processing_type", [])
-            self.taste_experience: list[str] = properties.get("da_a_taste_experience", [])
-            self.preparation_type: list[str] = properties.get("da_a_type_of_preparation_cookware", [])
-            self.sliced: bool = not len(properties.get("da_sliced", [])) == 0
-            self.regionalism: list[str] = properties.get("da_regionalism", [])
-            self.sliced_method: list[str] = properties.get("da_cutting_method", [])
-            self.sizing: list[str] = properties.get("da_a_sizing", [])
-            self.grain_type: list[str] = properties.get("da_type_of_grain", [])
-            self.animal_species: list[str] = properties.get("da_animal_species", [])
-            self.egg_type: list[str] = properties.get("da_type_of_egg", [])
-            self.moments_of_use: list[str] = properties.get("da_moments_of_use", [])
-            self.maturity: list[str] = properties.get("da_maturity", [])
-            self.fat_content: list[str] = properties.get("da_fat_content", [])
-            self.bake_off: bool = not len(properties.get("da_product_bake_off", [])) == 0
+            self.fragrance = properties.get("da_fragrance", [])
 
-            self.store_department: list[str] = properties.get("da_store_department", [])
+            smaak: list[str] = properties.get("np_smaak", [])
+            self.taste = properties.get("da_taste", [])
+            self.taste.extend(smaak)
 
+            kleur: list[str] = properties.get("np_kleur", [])
+            self.colour = properties.get("da_colour", [])
+            self.colour.extend(kleur)
+
+            druivenras: list[str] = properties.get("np_druivenras", [])
+            self.grape = properties.get("da_grape", [])
+            self.grape.extend(druivenras)
+
+            self.processing_type = properties.get("da_processing_type", [])
+            self.processed_type = properties.get("da_type_of_processed_food", [])
+            self.taste_experience = properties.get("da_a_taste_experience", [])
+            self.preparation_type = properties.get("da_a_type_of_preparation_cookware", [])
+            self.regionalism = properties.get("da_regionalism", [])
+            self.sliced_method = properties.get("da_cutting_method", [])
+            self.sizing = properties.get("da_a_sizing", [])
+            self.grain_type = properties.get("da_type_of_grain", [])
+            self.animal_species = properties.get("da_animal_species", [])
+            self.egg_type = properties.get("da_type_of_egg", [])
+            self.moments_of_use = properties.get("da_moments_of_use", [])
+
+            maturation: list[str] = properties.get("np_rijping", [])
+            self.maturity = properties.get("da_maturity", [])
+            self.maturity.extend(maturation)
+
+            vetgehalte: list[str] = properties.get("np_vetgehalte", [])
+            self.fat_content = properties.get("da_fat_content", [])
+            self.fat_content.extend(vetgehalte)
+
+            self.accreditation = properties.get("da_accreditation", [])
+            self.quality_mark = properties.get("da_quality_mark", [])
+            self.characteristic = properties.get("sp_kenmerk", [])
+            self.form = properties.get("np_vorm", [])
+            self.packaging = properties.get("np_verpakking", [])
+            self.product_type = properties.get("np_soort", [])
+            self.kitchen = properties.get("np_keuken", [])
+            self.special_occasion = properties.get("np_seizoen", [])
+            self.freshness = properties.get("np_versheid", [])
+            self.application = properties.get("np_toepassing", [])
+            self.carbonic_acid = properties.get("np_koolzuur", [])
+            self.carbonic_acid_intensity = properties.get("da_carbonation_intensity", [])
+            self.taste_intensity = properties.get("da_taste_intensity", [])
+            self.coffee_machine_type = properties.get("da_type_of_coffee_machine", [])
+            self.bread_type = properties.get("da_type_of_bread", [])
+
+            recommended_usage: list[str] = properties.get("da_recommended_usage", [])
+            self.usage = properties.get("da_usage", [])
+            self.usage.extend(recommended_usage)
+
+            self.closure_method = properties.get("da_closure_method", [])
+            self.tasty_with = properties.get("da_tasty_with", [])
+
+            streek: list[str] = properties.get("np_streek", [])
+            self.region = properties.get("da_region", [])
+            self.region.extend(streek)
+
+            self.wash_type = properties.get("da_type_of_washes", [])
+            self.liquid_solid = properties.get("da_liquid_solid", [])
+            self.usage_location = properties.get("da_recommended_usage_loc", [])
+            self.taste_profile = properties.get("da_bis_smaakprofiel", [])
+            self.amount_washes = properties.get("da_amount_of_washes", [])
+            self.age_usage = properties.get("np_leeftijd", [])
+            self.hair_type = properties.get("da_type_of_hair", [])
+            self.skin_type = properties.get("da_type_of_skin", [])
+            layers: Optional[str] = properties.get("da_toilet_paper_layers")
+            self.toilet_paper_layers = int(layers) if not layers is None else None
+            self.feed_type = properties.get("da_type_of_feed", [])
+            self.connection_type = properties.get("da_type_of_connection", [])
+            self.watt = properties.get("da_watt", [])
+            self.tobacco = properties.get("np_tabak", [])
+
+            self.store_department = properties.get("da_store_department", [])
+
+            self.nutriscore = properties.get("nutriscore", [None])[0]
+
+            self.country = properties.get("da_country", [None])[0]
+            if self.country is None:
+                self.country = properties.get("np_land", [None])[0]
+
+            self.wine_type = properties.get("da_wine_type", [None])[0]
+
+            self.sliced = not len(properties.get("da_sliced", [])) == 0
+            self.bake_off = not len(properties.get("da_product_bake_off", [])) == 0
             self.caffeine_free = len(properties.get("da_free_of_caffeine", [])) == 0
-            self.sugar_free: bool = properties.get("da_free_of_sugar", ["Nee"])[0] == "Ja"
+
+            self.sugar_free = properties.get("da_free_of_sugar", ["Nee"])[0] == "Ja"
+            if not self.sugar_free:
+                self.sugar_free = not len(properties.get("np_suikervrij", [])) == 0
+
             self.local = not len(properties.get("np_lokaal", [])) == 0
-            self.alcohol_free: bool = properties.get("da_free_of_alcohol", ["Ja"])[0] == "Ja"
-            self.salted: bool = properties.get("da_salted_or_not_salted", ["Ongezouten"])[0] == "Gezouten"
+            self.alcohol_free = properties.get("da_free_of_alcohol", ["Ja"])[0] == "Ja"
+            self.salted = properties.get("da_salted_or_not_salted", ["Ongezouten"])[0] == "Gezouten"
+            self.cheap_option = not len(properties.get("np_goedkoopje", [])) == 0
+
+            self.new = not len(properties.get("np_nieuw_2", [])) == 0
+            if not self.new:
+                self.new = not len(properties.get("np_nieuw", [])) == 0
+
+            self.amazingly_cheap = not len(properties.get("np_verbluffen", [])) == 0
+            self.value_pack = not len(properties.get("np_voordeel", [])) == 0
+            self.pure_honest = not len(properties.get("np_puureerlij", [])) == 0
+            self.freezer = not len(properties.get("diepvries", [])) == 0
+            self.party_favorite = not len(properties.get("np_feestfav", [])) == 0
+            self.ready = not len(properties.get("np_kant+klaar", [])) == 0
+            self.fairtrade = not len(properties.get("np_fairtrade", [])) == 0
+            self.sustainable_catch = not len(properties.get("np_duurzaam", [])) == 0
+            self.free_range_meat = not len(properties.get("np_scharrel", [])) == 0
+            self.greenfield = not len(properties.get("np_greenfield", [])) == 0
+            self.kids = not len(properties.get("np_kids", [])) == 0
+            self.elderly = not len(properties.get("np_ouderen", [])) == 0
+            self.soja_dairy = not len(properties.get("np_sojazuivel", [])) == 0
+            self.etos = not len(properties.get("np_etos", [])) == 0
+            self.men = not len(properties.get("np_man", [])) == 0
+            self.women = not len(properties.get("np_vrouw", [])) == 0
+            self.dimmable = not len(properties.get("da_dim_function", [])) == 0
 
             # dieet
             self.vegan = not len(properties.get("sp_include_dieet_veganistisch", [])) == 0
+
             self.vegeterian = not len(properties.get("sp_include_dieet_vegetarisch", [])) == 0
+            if not self.vegeterian:
+                self.vegeterian = not len(properties.get("np_vegetarisc", [])) == 0
+
             self.low_salt = not len(properties.get("sp_include_dieet_laag_zout", [])) == 0
             self.organic = not len(properties.get("sp_include_dieet_biologisch", [])) == 0
             self.low_fat = not len(properties.get("sp_include_dieet_laag_vet", [])) == 0
-            self.halal = not len(properties.get("sp_exclude_dieet_halal", [])) == 0
+            self.halal = not len(properties.get("sp_include_dieet_halal", [])) == 0
             self.low_sugar = not len(properties.get("sp_include_dieet_laag_suiker", [])) == 0
+            if not self.low_sugar:
+                self.low_sugar = not len(properties.get("np_suikergeha", [])) == 0
 
             # intolerance
             self.celery_free = not len(properties.get("sp_include_intolerance_geen_selderij", [])) == 0
@@ -329,7 +471,11 @@ class Client:
             self.egg_free = not len(properties.get("sp_include_intolerance_geen_eieren", [])) == 0
             self.fish_free = not len(properties.get("sp_include_intolerance_geen_vis", [])) == 0
             self.gluten_free = not len(properties.get("sp_include_intolerance_geen_gluten", [])) == 0
+
             self.lactose_free = not len(properties.get("sp_include_intolerance_geen_lactose", [])) == 0
+            if not self.lactose_free:
+                self.lactose_free = not len(properties.get("np_lactose", [])) == 0
+
             self.lupine_free = not len(properties.get("sp_include_intolerance_geen_lupine", [])) == 0
             self.milk_free = not len(properties.get("sp_include_intolerance_geen_melk", [])) == 0
             self.shellfish_free = not len(properties.get("sp_include_intolerance_geen_schelpdieren", [])) == 0
@@ -402,7 +548,7 @@ class Client:
 
             return self.subs
 
-        def lookup(self, id: Optional[int] = None, name: Optional[str] = None):
+        def lookup(self, id: Optional[int] = None, name: Optional[str] = None) -> Optional[Client.Category]:
             if not id is None:
                 return None
             elif not name is None:
@@ -431,7 +577,7 @@ class Client:
             data: Optional[dict[str, Any]] = None,
         ) -> None:
             super().__init__()
-            self.client = client
+            self.__client = client
 
             if not url is None:
                 self.url = url
@@ -445,12 +591,3 @@ class Client:
                 self.height = data.get("height")
             else:
                 raise ValueError("When initilizing category need to have data or url")
-
-
-if __name__ == "__main__":
-    client = Client(True, "data.json")
-    print(client.categories.list())
-    # print(client.categories.data[0])
-    # print(client.products.list(client.categories.data[0]))
-    # # print(client.products.list(client.categories.data[0]))
-    # print(client.products.data[0].details())
