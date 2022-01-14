@@ -3,18 +3,22 @@ from __future__ import annotations
 import json
 import math
 import os
+import shutil
 import tempfile
+from datetime import date
 from typing import Any, Optional, Union
+import typing
 
 import requests
 from requests.models import Response
-from supermarket_connector.models.category import Category
-from supermarket_connector.models.image import Image
-from supermarket_connector.models.product import Product
 
 # from supermarket_connector.nl.jumbo import errors
 from supermarket_connector import utils
+from supermarket_connector.enums import ProductAvailabilityStatus, ProductType
 
+from supermarket_connector.models.category import Category
+from supermarket_connector.models.image import Image
+from supermarket_connector.models.product import Product
 from unidecode import unidecode
 
 
@@ -24,25 +28,27 @@ class Client:
     TEMP_DIR = os.path.join(tempfile.gettempdir(), "Supermarket-Connector", "Debug", "JUMBO")
 
     def request(
-        self,
-        method: str,
-        end_point: str,
-        headers: dict[str, Any] = {},
-        params: dict[str, Any] = {},
-        timeout: int = 10,
-        json_: bool = True,
-    ) -> Union[str, Any]:
+        self, method: str, end_point: str, headers: dict[str, Any] = {}, params: dict[str, Any] = {}, timeout: int = 10, json_: bool = True, debug_key: Optional[str] = None
+    ) -> Union[list[Any], dict[Any, Any], str]:
 
         headers.update(self.DEFAULT_HEADERS)
 
-        response: Response = requests.request(method, f"{self.BASE_URL}{end_point}", params=params, headers=headers, timeout=timeout)
+        while True:
+            try:
+                response: Response = requests.request(method, f"{self.BASE_URL}{end_point}", params=params, headers=headers, timeout=timeout)
+            except Exception:
+                continue
+            else:
+                break
 
         if not response.ok:
-            response.raise_for_status()
+            if self.debug:
+                print(f"Connection error: {response.status_code}")
+            return self.request(method, end_point, headers, params, timeout, json_, debug_key)
 
         if json_:
             try:
-                response_json = response.json()
+                response_json: Union[list[Any], dict[Any, Any]] = response.json()
 
                 if self.debug:
                     if self.debug_fn is None:
@@ -51,24 +57,36 @@ class Client:
                         print("Currently only json format is supported")
                     else:
                         debug_path = os.path.join(self.TEMP_DIR, self.debug_fn)
+                        debug_path_old = os.path.join(self.TEMP_DIR, self.debug_fn.replace(".json", "_old.json"))
                         if os.path.isfile(debug_path):
                             with open(debug_path, "r") as f:
-                                data = json.load(f)
+                                try:
+                                    data = json.load(f)
+                                    shutil.copyfile(debug_path, debug_path_old)
+                                except ValueError:
+                                    data = {}
+                                    pass
                         else:
                             data = {}
 
-                        if not end_point in data.keys():
+                        if not debug_key in data.keys() and not debug_key is None:
+                            data[debug_key] = {}
+
+                        if not end_point in data.keys() and debug_key is None:
                             data[end_point] = {}
+
+                        if not debug_key is None:
+                            key = debug_key
+                        else:
+                            key = end_point
 
                         with open(debug_path, "w") as f:
                             if isinstance(response_json, list):
-                                data[end_point] = utils.process_type(response_json, data[end_point], self.debug_value)
-                                json.dump(data, f)
-                            elif isinstance(response_json, dict):
-                                data[end_point] = utils.type_def_dict(response_json, data[end_point], self.debug_value)
+                                data[key] = utils.process_type(response_json, data[key], self.debug_value)
                                 json.dump(data, f)
                             else:
-                                print("Currently only list or dict format response supported")
+                                data[key] = utils.type_def_dict(response_json, data[key], self.debug_value)
+                                json.dump(data, f)
 
                 return response_json
             except ValueError:
@@ -95,7 +113,7 @@ class Client:
     class Categories:
         def __init__(self, client: Client) -> None:
             self.__client = client
-            self.data: list[Client.Category] = []
+            self.data: dict[int, Client.Category] = {}
 
         def list(self):
             response = self.__client.request("GET", "v17/categories")
@@ -103,34 +121,33 @@ class Client:
             if not isinstance(response, dict):
                 raise ValueError("Reponse is not in right format")
 
-            data = response.get("categories", {}).get("data", [])
+            data: list[dict[Any, Any]] = response.get("categories", {}).get("data", [])
 
             for elem in data:
-                if not isinstance(elem, dict):
-                    raise ValueError("Expected dict")
                 category = self.__client.Category(self.__client, data=elem)
                 if not category is None:
-                    self.data.append(category)
+                    if not category.id in self.data.keys():
+                        self.data[category.id] = category
 
             return self.data
 
         def get(self, id: Optional[int] = None, name: Optional[str] = None):
             if not id is None:
-                for category in self.data:
-                    if category.id == id:
-                        return category
+                if id in self.data.keys():
+                    self.data[id]
 
-                for category in self.list():
-                    if category.id == id:
-                        return category
+                self.list()
+
+                if id in self.data.keys():
+                    self.data[id]
 
             elif not name is None:
-                for category in self.data:
+                for category in self.data.values():
                     lookup = category.lookup(name=name)
                     if not lookup is None:
                         return lookup
 
-                for category in self.list():
+                for category in self.list().values():
                     lookup = category.lookup(name=name)
                     if not lookup is None:
                         return lookup
@@ -140,12 +157,23 @@ class Client:
     class Products:
         def __init__(self, client: Client) -> None:
             self.__client = client
-            self.data: list[Client.Product] = []
+            self.data: dict[int, dict[str, Client.Product]] = {}
+
+        @typing.overload
+        def list(self) -> dict[int, dict[str, Client.Product]]:
+            ...
+
+        @typing.overload
+        def list(self, category: Client.Category) -> dict[str, Client.Product]:
+            ...
 
         def list(self, category: Optional[Client.Category] = None):
             if category is None:
-                for category in self.__client.categories.list():
+                for category in self.__client.categories.list().values():
+                    self.__client.debug_fn = f"{category.name}.json"
                     self.__client.products.list(category)
+                    self.__client.debug_fn = "data.json"
+                    print(category.name)
                 return self.data
             else:
                 total_pages = 0
@@ -153,7 +181,10 @@ class Client:
                 max_size = 30
 
                 while True:
-                    response = self.__client.request("GET", "v17/search", params={"offset": page * max_size, "limit": max_size, "query": None})
+                    if self.data.get(category.id) is None:
+                        self.data[category.id] = {}
+
+                    response = self.__client.request("GET", "v17/search", params={"offset": page * max_size, "limit": max_size, "q": None, "filters": category.id})
 
                     if not isinstance(response, dict):
                         raise ValueError("Expected response to be dict")
@@ -161,17 +192,20 @@ class Client:
                     if total_pages == 0:
                         total_pages: int = math.ceil(response.get("products", {}).get("total", 30) / max_size)
 
-                    for product in response.get("products", {}).get("data", []):
+                    data: list[dict[Any, Any]] = response.get("products", {}).get("data", [])
+
+                    for product in data:
                         temp_ = self.__client.Product(self.__client, data=product)
                         if not temp_ is None:
-                            self.data.append(temp_)
+                            if not temp_.id in self.data[category.id].keys():
+                                self.data[category.id][temp_.id] = temp_
 
                     page += 1
 
                     if page == total_pages:
                         break
 
-                return self.data
+                return self.data[category.id]
 
     class Images:
         def __init__(self, client: Client) -> None:
@@ -193,6 +227,9 @@ class Client:
                 self.id = id
             elif not data is None:
                 images_data: list[dict[str, Any]] = data.get("imageInfo", {}).get("primaryView", [])
+                quantity_data: dict[str, Any] = data.get("quantityOptions", [{}])[0]
+                price_data: dict[str, Any] = data.get("prices", {})
+                bonus_data: dict[str, Any] = data.get("promotion", {})
 
                 id = data.get("id")
 
@@ -201,75 +238,70 @@ class Client:
 
                 self.id = id
                 self.name = data.get("title")
-                quantity_options = data.get("quantityOptions", {})
-                self.unit_size = quantity_options.get("unit")
+                self.unit_size = quantity_data.get("unit")
+                self.default_amount = quantity_data.get("defaultAmount")
+                self.minimum_amount = quantity_data.get("minimumAmount")
+                self.amount_stepsize = quantity_data.get("amountStep")
+                self.maximum_amount = quantity_data.get("maximumAmount")
+
+                self.price_raw = price_data.get("price", {}).get("amount")
+                if not self.price_raw is None:
+                    self.price_raw = self.price_raw / 100
+
+                self.price_current = price_data.get("promotionalPrice", {}).get("amount")
+                if not self.price_current is None:
+                    self.price_current = self.price_current / 100
+
+                unit_size: Optional[str] = price_data.get("unitPrice", {}).get("unit")
+                unit_size_price: Optional[Union[int, float]] = price_data.get("unitPrice", {}).get("price", {}).get("amount")
+                if not unit_size_price is None:
+                    unit_size_price = unit_size_price / 100
+
+                self.unit_price_description = f"{unit_size_price} per {unit_size}"
+                self.available_online = data.get("available", False)
+                self.type = ProductType[data.get("productType", "UNKNOWN").upper()]
+                self.nix18 = data.get("nixProduct", False)
+                self.quantity = data.get("quantity")
                 self.images = self.__client.images.process(images_data)
 
+                self.bonus_start_date = date.fromtimestamp(bonus_data.get("fromDate", 0))
+                self.bonus_end_date = date.fromtimestamp(bonus_data.get("toDate", 0))
+                self.bonus_period_description = bonus_data.get("validityPeriod")
+                self.bonus_segment_description = bonus_data.get("summary")
+                self.bonus_mechanism = bonus_data.get("tags", [{}])[0].get("text")
+
+                self.stickers = data.get("stickerBadges", [])
+                self.sample = data.get("sample", False)
+                self.order_availability = ProductAvailabilityStatus[data.get("unavailabilityReason", "IN_ASSORTMENT")]
+                self.order_availability_description = data.get("reason")
+
+                self.bonus = not data.get("promotion") is None
             else:
                 raise ValueError("When initilizing category need to have data or id")
 
         def details(self):
-            response = self.__client.request("GET", f"mobile-services/product/detail/v4/fir/{self.id}")
+            response = self.__client.request("GET", f"v17/products/{self.id}", debug_key="product_details")
 
             if not isinstance(response, dict):
                 raise ValueError("Expected value to be dict")
 
-            data: dict[str, Any] = response
-            productCard = data.get("productCard", {})
-            self.subcategory_id: Optional[int] = productCard.get("subCategoryId")
+            data: dict[str, Any] = response.get("product", {})
+            productCard: dict[str, Any] = data.get("data", {})
+            brand_data: dict[str, Any] = productCard.get("brandInfo", {})
+            # alergy_data: list[str] = productCard.get("allergyText", "").split(",")
 
-            properties = productCard.get("properties", {})
+            self.category = productCard.get("topLevelCategory")
+            self.category_id = productCard.get("topLevelCategoryId")
+            self.description_extra = productCard.get("detailsText")
+            self.sizing = productCard.get("numberOfServings", "").split("-")
 
-            self.fragrance: list[str] = properties.get("da_fragrance", [])
-            self.taste: list[str] = properties.get("da_taste", [])
-            self.processing_type: list[str] = properties.get("da_processing_type", [])
-            self.taste_experience: list[str] = properties.get("da_a_taste_experience", [])
-            self.preparation_type: list[str] = properties.get("da_a_type_of_preparation_cookware", [])
-            self.sliced: bool = not len(properties.get("da_sliced", [])) == 0
-            self.regionalism: list[str] = properties.get("da_regionalism", [])
-            self.sliced_method: list[str] = properties.get("da_cutting_method", [])
-            self.sizing: list[str] = properties.get("da_a_sizing", [])
-            self.grain_type: list[str] = properties.get("da_type_of_grain", [])
-            self.animal_species: list[str] = properties.get("da_animal_species", [])
-            self.egg_type: list[str] = properties.get("da_type_of_egg", [])
-            self.moments_of_use: list[str] = properties.get("da_moments_of_use", [])
-            self.maturity: list[str] = properties.get("da_maturity", [])
-            self.fat_content: list[str] = properties.get("da_fat_content", [])
-            self.bake_off: bool = not len(properties.get("da_product_bake_off", [])) == 0
+            self.storage_advice = productCard.get("usageAndSafetyInfo", {}).get("storageType")
+            self.country = productCard.get("originInfo", {}).get("countryOfOrigin")
 
-            self.store_department: list[str] = properties.get("da_store_department", [])
-
-            self.caffeine_free = len(properties.get("da_free_of_caffeine", [])) == 0
-            self.sugar_free: bool = properties.get("da_free_of_sugar", ["Nee"])[0] == "Ja"
-            self.local = not len(properties.get("np_lokaal", [])) == 0
-            self.alcohol_free: bool = properties.get("da_free_of_alcohol", ["Ja"])[0] == "Ja"
-            self.salted: bool = properties.get("da_salted_or_not_salted", ["Ongezouten"])[0] == "Gezouten"
-
-            # dieet
-            self.vegan = not len(properties.get("sp_include_dieet_veganistisch", [])) == 0
-            self.vegeterian = not len(properties.get("sp_include_dieet_vegetarisch", [])) == 0
-            self.low_salt = not len(properties.get("sp_include_dieet_laag_zout", [])) == 0
-            self.organic = not len(properties.get("sp_include_dieet_biologisch", [])) == 0
-            self.low_fat = not len(properties.get("sp_include_dieet_laag_vet", [])) == 0
-            self.halal = not len(properties.get("sp_exclude_dieet_halal", [])) == 0
-            self.low_sugar = not len(properties.get("sp_include_dieet_laag_suiker", [])) == 0
-
-            # intolerance
-            self.celery_free = not len(properties.get("sp_include_intolerance_geen_selderij", [])) == 0
-            self.lobster_free = not len(properties.get("sp_include_intolerance_geen_kreeftachtigen", [])) == 0
-            self.egg_free = not len(properties.get("sp_include_intolerance_geen_eieren", [])) == 0
-            self.fish_free = not len(properties.get("sp_include_intolerance_geen_vis", [])) == 0
-            self.gluten_free = not len(properties.get("sp_include_intolerance_geen_gluten", [])) == 0
-            self.lactose_free = not len(properties.get("sp_include_intolerance_geen_lactose", [])) == 0
-            self.lupine_free = not len(properties.get("sp_include_intolerance_geen_lupine", [])) == 0
-            self.milk_free = not len(properties.get("sp_include_intolerance_geen_melk", [])) == 0
-            self.shellfish_free = not len(properties.get("sp_include_intolerance_geen_schelpdieren", [])) == 0
-            self.mustard_free = not len(properties.get("sp_include_intolerance_geen_mosterd", [])) == 0
-            self.peanut_free = not len(properties.get("sp_include_intolerance_geen_pindas", [])) == 0
-            self.sesame_free = not len(properties.get("sp_include_intolerance_geen_sesam", [])) == 0
-            self.soja_free = not len(properties.get("sp_include_intolerance_geen_soja", [])) == 0
-            self.sulfite_free = not len(properties.get("sp_include_intolerance_geen_sulfiet", [])) == 0
-            self.nuts_free = not len(properties.get("sp_include_intolerance_geen_noten", [])) == 0
+            self.brand_description = brand_data.get("brandDescription")
+            self.brand_address = brand_data.get("manufacturerAddress")
+            self.brand_webaddress = brand_data.get("webAddress")
+            self.brand_phone = brand_data.get("telephoneHelpline")
 
             return self
 
@@ -377,15 +409,3 @@ class Client:
                 self.height = data.get("height")
             else:
                 raise ValueError("When initilizing image need to have data or url")
-
-
-if __name__ == "__main__":
-    client = Client(True, "data.json")
-    for elem in client.categories.list():
-        for elem2 in elem.list_subs():
-            print(elem2.slug_name)
-
-    # print(client.categories.data[0])
-    # print(client.products.list(client.categories.data[0]))
-    # # print(client.products.list(client.categories.data[0]))
-    # print(client.products.data[0].details())
