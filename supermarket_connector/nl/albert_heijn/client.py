@@ -187,13 +187,17 @@ class Client:
 
         def list(self, category: Optional[Client.Category] = None):
             if category is None:
+                old_file_name = None
                 for category in self.__client.categories.list().values():
                     if self.__client.debug_value:
+                        old_file_name = self.__client.debug_fn
                         self.__client.debug_fn = f"product_{category.name}.json"
                     self.__client.products.list(category)
                     print(category.name)
 
-                self.__client.debug_fn = "data.json"
+                if not old_file_name is None:
+                    self.__client.debug_fn = old_file_name
+
                 return self.data
             else:
                 sub_category = False
@@ -323,11 +327,11 @@ class Client:
                 raise ValueError("Expected value to be dict")
 
             data: dict[str, Any] = response
-            productCard = data.get("productCard", {})
+            productCard: dict[str, Any] = data.get("productCard", {})
             self.subcategory_id = productCard.get("subCategoryId")
             self.description_extra = "\n".join(productCard.get("extraDescriptions", []))
 
-            properties = productCard.get("properties", {})
+            properties: dict[str, Any] = productCard.get("properties", {})
 
             self.fragrance = properties.get("da_fragrance", [])
 
@@ -532,7 +536,7 @@ class Client:
             self.subs: list[Client.Category] = []
 
         def list_subs(self, recursive: bool = True):
-            response = self.__client.request("GET", f"mobile-services/v1/product-shelves/categories/{self.id}/sub-categories")
+            response = self.__client.request("GET", f"mobile-services/v1/product-shelves/categories/{self.id}/sub-categories", debug_key="list_subcategories")
 
             if not isinstance(response, dict):
                 raise ValueError("Expected response to be dict")
@@ -550,7 +554,20 @@ class Client:
 
         def lookup(self, id: Optional[int] = None, name: Optional[str] = None) -> Optional[Client.Category]:
             if not id is None:
-                return None
+                if self.id == id:
+                    return self
+                else:
+                    for sub in self.subs:
+                        lookup = sub.lookup(id=id)
+                        if not lookup is None:
+                            return lookup
+
+                    for sub in self.list_subs(False):
+                        lookup = sub.lookup(id=id)
+                        if not lookup is None:
+                            return lookup
+
+                    return None
             elif not name is None:
                 if self.name == name:
                     return self
