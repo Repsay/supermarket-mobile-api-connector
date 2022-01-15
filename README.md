@@ -9,7 +9,7 @@ Simple api-clients for different supermarket mobile apis.
 
 ```python
 
-from supermarket_connector.nl.albert_heijn import Client
+from supermarket_connector.nl.albert_heijn.client import Client
 
 ah_client = Client()
 
