@@ -4,9 +4,9 @@ import json
 import os
 import shutil
 import tempfile
+import typing
 from datetime import date
 from typing import Any, Optional, Union
-import typing
 
 import requests
 from requests.models import Response

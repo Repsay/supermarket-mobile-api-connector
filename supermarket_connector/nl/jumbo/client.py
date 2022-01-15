@@ -5,17 +5,14 @@ import math
 import os
 import shutil
 import tempfile
+import typing
 from datetime import date
 from typing import Any, Optional, Union
-import typing
 
 import requests
 from requests.models import Response
-
-# from supermarket_connector.nl.jumbo import errors
 from supermarket_connector import utils
 from supermarket_connector.enums import ProductAvailabilityStatus, ProductType
-
 from supermarket_connector.models.category import Category
 from supermarket_connector.models.image import Image
 from supermarket_connector.models.product import Product

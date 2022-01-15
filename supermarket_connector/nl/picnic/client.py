@@ -1,21 +1,20 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import shutil
 import tempfile
 import typing
-import hashlib
 from typing import Any, Optional, Union
 
 import requests
 from requests.models import Response
-from unidecode import unidecode
 from supermarket_connector import utils
-
 from supermarket_connector.models.category import Category
 from supermarket_connector.models.image import Image
 from supermarket_connector.models.product import Product
+from unidecode import unidecode
 
 
 def get_items(list_: Optional[list[dict[str, Any]]]) -> list[dict[str, Any]]:
