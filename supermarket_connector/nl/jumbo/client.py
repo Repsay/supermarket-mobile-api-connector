@@ -166,11 +166,17 @@ class Client:
 
         def list(self, category: Optional[Client.Category] = None):
             if category is None:
+                old_file_name = None
                 for category in self.__client.categories.list().values():
-                    self.__client.debug_fn = f"{category.name}.json"
+                    if self.__client.debug_value:
+                        old_file_name = self.__client.debug_fn
+                        self.__client.debug_fn = f"{category.name}.json"
                     self.__client.products.list(category)
-                    self.__client.debug_fn = "data.json"
                     print(category.name)
+
+                if not old_file_name is None:
+                    self.__client.debug_fn = old_file_name
+
                 return self.data
             else:
                 total_pages = 0
@@ -365,7 +371,21 @@ class Client:
 
         def lookup(self, id: Optional[int] = None, name: Optional[str] = None) -> Optional[Client.Category]:
             if not id is None:
-                return None
+                if self.id == id:
+                    return self
+                else:
+                    for sub in self.subs:
+                        lookup = sub.lookup(id=id)
+                        if not lookup is None:
+                            return lookup
+
+                    for sub in self.list_subs(False):
+                        lookup = sub.lookup(id=id)
+                        if not lookup is None:
+                            return lookup
+
+                    return None
+
             elif not name is None:
                 if self.name == name:
                     return self
