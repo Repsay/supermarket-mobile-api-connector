@@ -17,17 +17,19 @@ from supermarket_connector.models.product import Product
 from unidecode import unidecode
 
 
-def get_items(list_: Optional[list[dict[str, Any]]]) -> list[dict[str, Any]]:
+def get_items(client: Client, list_: Optional[list[dict[str, Any]]]) -> dict[int, Client.Product]:
     if list_ is None:
-        return []
+        return {}
 
-    temp: list[dict[str, Any]] = []
+    temp: dict[int, Client.Product] = {}
 
     for elem in list_:
         if elem.get("type") == "SINGLE_ARTICLE":
-            temp.append(elem)
+            product = client.Product(client, data=elem)
+            if not product is None:
+                temp[product.id] = product
 
-        temp.extend(get_items(elem.get("items")))
+        temp.update(get_items(client, elem.get("items")))
 
     return temp
 
@@ -190,16 +192,15 @@ class Client:
     class Products:
         def __init__(self, client: Client) -> None:
             self.__client = client
-            self.data: dict[int, list[dict[str, Any]]] = {}
-            # self.data: dict[int, dict[int, Client.Product]] = {}
+            self.data: dict[int, dict[int, Client.Product]] = {}
 
-        # @typing.overload
-        # def list(self) -> dict[int, dict[str, Client.Product]]:
-        #     ...
+        @typing.overload
+        def list(self) -> dict[int, dict[int, Client.Product]]:
+            ...
 
-        # @typing.overload
-        # def list(self, category: Client.Category) -> dict[str, Client.Product]:
-        #     ...
+        @typing.overload
+        def list(self, category: Client.Category) -> dict[int, Client.Product]:
+            ...
 
         def list(self, category: Optional[Client.Category] = None):
             if category is None:
@@ -210,19 +211,23 @@ class Client:
                 catalog: list[dict[str, Any]] = response.get("catalog", [])
 
                 for key in self.__client.categories.list().keys():
+                    if not key in self.data.keys():
+                        self.data[key] = {}
+
+                    print(key)
+
                     for elem in catalog:
                         if elem.get("id") == str(key):
-                            articles: list[dict[str, Any]] = []
-
                             if elem.get("type") == "SINGLE_ARTICLE":
-                                articles.append(elem)
-                                self.data[key] = articles
+                                product = self.__client.Product(self.__client, data=elem)
+                                if not product is None:
+                                    self.data[key][product.id] = product
                             else:
-                                self.data[key] = get_items(elem.get("items"))
+                                self.data[key] = get_items(self.__client, elem.get("items"))
 
                 return self.data
             else:
-                pass
+                return self.data[1]
 
     class Category(Category):
         def __init__(
@@ -252,6 +257,52 @@ class Client:
                 if not self.name is None:
                     self.slug_name = unidecode(self.name).lower().replace(",", "").replace("&", "").replace("  ", "-").replace(" ", "-")
             else:
-                raise ValueError("When initilizing category need to have data or id")
+                raise ValueError("When initializing category need to have data or id")
 
             self.subs: list[Client.Category] = []
+
+    class Product(Product):
+        def __init__(self, client: Client, id: Optional[int] = None, data: Optional[dict[str, Any]] = None) -> None:
+            super().__init__()
+            self.__client = client
+
+            if data is None and not id is None:
+                self.id = id
+            elif not data is None:
+                id = data.get("id")
+                decorator_data: list[dict[str, Any]] = data.get("decorators", [])
+
+                if id is None:
+                    raise ValueError("Expected data to have ID")
+
+                self.id = int(id)
+                self.name = data.get("name")
+                self.unit_size = data.get("unit_quantity")
+                self.unit_price_description = data.get("unit_quantity_sub")
+                self.maximum_amount = data.get("max_count")
+                self.image_id = data.get("image_id")
+
+                self.price_raw = data.get("display_price")
+                if not self.price_raw is None:
+                    self.price_raw = self.price_raw / 100
+
+                for decorator in decorator_data:
+                    if decorator.get("type") == "PRICE":
+                        self.bonus = True
+                        self.price_current = decorator.get("display_price")
+                        if not self.price_current is None:
+                            self.price_current = self.price_current / 100
+
+                    if decorator.get("type") == "LABEL":
+                        if decorator.get("text") != "NIEUW":
+                            self.bonus_mechanism = decorator.get("text")
+            else:
+                raise ValueError("When initializing product need to have data or id")
+
+        def details(self):
+            response = self.__client.request("GET", f"15/product/{self.id}", debug_key="product_details")
+
+        def price(self):
+            if not self.price_current is None:
+                return self.price_current
+            return self.price_raw
