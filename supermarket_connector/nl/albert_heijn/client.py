@@ -19,14 +19,22 @@ from supermarket_connector.nl.albert_heijn import errors
 
 
 class Client:
-    BASE_URL = "https://ms.ah.nl/"
-    DEFAULT_HEADERS = {"User-Agent": "android/6.29.3 Model/phone Android/7.0-API24", "Host": "ms.ah.nl"}
+    BASE_URL = "https://api.ah.nl/"
+    DEFAULT_HEADERS = {
+        "User-Agent": "android/6.29.3 Model/phone Android/7.0-API24",
+        "Host": "api.ah.nl",
+        "Cache-Control": "no-cache",
+        "Content-Type": "application/json",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Accept": "*/*",
+        "Connection": "keep-alive",
+    }
     TEMP_DIR = os.path.join(tempfile.gettempdir(), "Supermarket-Connector", "Debug", "AH")
 
     access_token: Optional[str] = None
 
     def get_anonymous_access_token(self) -> Optional[str]:
-        response = self.request("POST", "create-anonymous-member-token", params={"client": "appie-anonymous"}, authorized=False)
+        response = self.request("POST", "mobile-auth/v1/auth/token/anonymous", request_data={"clientId": "appie"}, authorized=False)
 
         if not isinstance(response, dict):
             raise ValueError("Expected JSON")
@@ -34,7 +42,16 @@ class Client:
         self.access_token = response.get("access_token")
 
     def request(
-        self, method: str, end_point: str, headers: dict[str, Any] = {}, params: dict[str, Any] = {}, timeout: int = 10, authorized: bool = True, json_: bool = True, debug_key: Optional[str] = None
+        self,
+        method: str,
+        end_point: str,
+        headers: dict[str, Any] = {},
+        params: dict[str, Any] = {},
+        request_data: Optional[dict[str, Any]] = None,
+        timeout: int = 10,
+        authorized: bool = True,
+        json_: bool = True,
+        debug_key: Optional[str] = None,
     ) -> Union[str, list[Any], dict[Any, Any]]:
 
         headers.update(self.DEFAULT_HEADERS)
@@ -46,7 +63,10 @@ class Client:
 
         while True:
             try:
-                response: Response = requests.request(method, f"{self.BASE_URL}{end_point}", params=params, headers=headers, timeout=timeout)
+                if not request_data is None:
+                    response: Response = requests.request(method, f"{self.BASE_URL}{end_point}", params=params, headers=headers, data=json.dumps(request_data), timeout=timeout)
+                else:
+                    response: Response = requests.request(method, f"{self.BASE_URL}{end_point}", params=params, headers=headers, timeout=timeout)
             except Exception:
                 continue
             else:
@@ -59,7 +79,8 @@ class Client:
             if not self.access_token is None:
                 if self.debug:
                     print(f"Connection error: {response.status_code}")
-                return self.request(method, end_point, headers, params, timeout, authorized, json_, debug_key)
+                    print(response.text)
+                return self.request(method, end_point, headers, params, request_data, timeout, authorized, json_, debug_key)
 
             response.raise_for_status()
 
