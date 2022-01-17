@@ -1,12 +1,10 @@
-from abc import ABC, abstractclassmethod
+import dataclasses
+from abc import ABC
 from typing import Optional
 
 
+@dataclasses.dataclass
 class Image(ABC):
-    height: Optional[int]
-    width: Optional[int]
-    url: Optional[str]
-
-    @abstractclassmethod
-    def __init__(self) -> None:
-        pass
+    url: Optional[str] = None
+    height: Optional[int] = None
+    width: Optional[int] = None

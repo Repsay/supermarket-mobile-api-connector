@@ -2,10 +2,12 @@ from typing import Any, Optional
 from supermarket_connector.enums import DiscountType, ProductAvailabilityStatus, BonusType, ProductType, SegmentType, ShopType
 
 from datetime import date
+from abc import ABC
+import abc
+import dataclasses
 
-from abc import ABC, abstractclassmethod
 
-
+@dataclasses.dataclass
 class Product(ABC):
     # Info
     id: Any
@@ -23,9 +25,9 @@ class Product(ABC):
     sponsored: bool = False
 
     # Images
-    images: list[Any] = []
-    icons: list[str] = []
-    stickers: list[str] = []
+    images: list[Any] = dataclasses.field(default_factory=lambda: [])
+    icons: list[str] = dataclasses.field(default_factory=lambda: [])
+    stickers: list[str] = dataclasses.field(default_factory=lambda: [])
 
     # Description
     description: Optional[str] = None
@@ -68,58 +70,58 @@ class Product(ABC):
 
     # Bundle
     bundle: bool = False
-    bundle_items: list[Any] = []
+    bundle_items: list[Any] = dataclasses.field(default_factory=lambda: [])
 
     # product details
-    fragrance: list[str] = []
-    taste: list[str] = []
-    colour: list[str] = []
-    grape: list[str] = []
-    processing_type: list[str] = []
-    processed_type: list[str] = []
-    taste_experience: list[str] = []
-    preparation_type: list[str] = []
-    regionalism: list[str] = []
-    sliced_method: list[str] = []
-    sizing: list[str] = []
-    grain_type: list[str] = []
-    animal_species: list[str] = []
-    egg_type: list[str] = []
-    moments_of_use: list[str] = []
-    maturity: list[str] = []
-    fat_content: list[str] = []
-    accreditation: list[str] = []
-    quality_mark: list[str] = []
-    form: list[str] = []
-    product_type: list[str] = []
-    packaging: list[str] = []
-    kitchen: list[str] = []
-    characteristic: list[str] = []
-    store_department: list[str] = []
-    special_occasion: list[str] = []
-    freshness: list[str] = []
-    application: list[str] = []
-    carbonic_acid: list[str] = []
-    carbonic_acid_intensity: list[str] = []
-    taste_intensity: list[str] = []
-    coffee_machine_type: list[str] = []
-    bread_type: list[str] = []
-    usage: list[str] = []
-    closure_method: list[str] = []
-    tasty_with: list[str] = []
-    region: list[str] = []
-    wash_type: list[str] = []
-    liquid_solid: list[str] = []
-    usage_location: list[str] = []
-    taste_profile: list[str] = []
-    amount_washes: list[str] = []
-    age_usage: list[str] = []
-    hair_type: list[str] = []
-    skin_type: list[str] = []
-    feed_type: list[str] = []
-    connection_type: list[str] = []
-    watt: list[str] = []
-    tobacco: list[str] = []
+    fragrance: list[str] = dataclasses.field(default_factory=lambda: [])
+    taste: list[str] = dataclasses.field(default_factory=lambda: [])
+    colour: list[str] = dataclasses.field(default_factory=lambda: [])
+    grape: list[str] = dataclasses.field(default_factory=lambda: [])
+    processing_type: list[str] = dataclasses.field(default_factory=lambda: [])
+    processed_type: list[str] = dataclasses.field(default_factory=lambda: [])
+    taste_experience: list[str] = dataclasses.field(default_factory=lambda: [])
+    preparation_type: list[str] = dataclasses.field(default_factory=lambda: [])
+    regionalism: list[str] = dataclasses.field(default_factory=lambda: [])
+    sliced_method: list[str] = dataclasses.field(default_factory=lambda: [])
+    sizing: list[str] = dataclasses.field(default_factory=lambda: [])
+    grain_type: list[str] = dataclasses.field(default_factory=lambda: [])
+    animal_species: list[str] = dataclasses.field(default_factory=lambda: [])
+    egg_type: list[str] = dataclasses.field(default_factory=lambda: [])
+    moments_of_use: list[str] = dataclasses.field(default_factory=lambda: [])
+    maturity: list[str] = dataclasses.field(default_factory=lambda: [])
+    fat_content: list[str] = dataclasses.field(default_factory=lambda: [])
+    accreditation: list[str] = dataclasses.field(default_factory=lambda: [])
+    quality_mark: list[str] = dataclasses.field(default_factory=lambda: [])
+    form: list[str] = dataclasses.field(default_factory=lambda: [])
+    product_type: list[str] = dataclasses.field(default_factory=lambda: [])
+    packaging: list[str] = dataclasses.field(default_factory=lambda: [])
+    kitchen: list[str] = dataclasses.field(default_factory=lambda: [])
+    characteristic: list[str] = dataclasses.field(default_factory=lambda: [])
+    store_department: list[str] = dataclasses.field(default_factory=lambda: [])
+    special_occasion: list[str] = dataclasses.field(default_factory=lambda: [])
+    freshness: list[str] = dataclasses.field(default_factory=lambda: [])
+    application: list[str] = dataclasses.field(default_factory=lambda: [])
+    carbonic_acid: list[str] = dataclasses.field(default_factory=lambda: [])
+    carbonic_acid_intensity: list[str] = dataclasses.field(default_factory=lambda: [])
+    taste_intensity: list[str] = dataclasses.field(default_factory=lambda: [])
+    coffee_machine_type: list[str] = dataclasses.field(default_factory=lambda: [])
+    bread_type: list[str] = dataclasses.field(default_factory=lambda: [])
+    usage: list[str] = dataclasses.field(default_factory=lambda: [])
+    closure_method: list[str] = dataclasses.field(default_factory=lambda: [])
+    tasty_with: list[str] = dataclasses.field(default_factory=lambda: [])
+    region: list[str] = dataclasses.field(default_factory=lambda: [])
+    wash_type: list[str] = dataclasses.field(default_factory=lambda: [])
+    liquid_solid: list[str] = dataclasses.field(default_factory=lambda: [])
+    usage_location: list[str] = dataclasses.field(default_factory=lambda: [])
+    taste_profile: list[str] = dataclasses.field(default_factory=lambda: [])
+    amount_washes: list[str] = dataclasses.field(default_factory=lambda: [])
+    age_usage: list[str] = dataclasses.field(default_factory=lambda: [])
+    hair_type: list[str] = dataclasses.field(default_factory=lambda: [])
+    skin_type: list[str] = dataclasses.field(default_factory=lambda: [])
+    feed_type: list[str] = dataclasses.field(default_factory=lambda: [])
+    connection_type: list[str] = dataclasses.field(default_factory=lambda: [])
+    watt: list[str] = dataclasses.field(default_factory=lambda: [])
+    tobacco: list[str] = dataclasses.field(default_factory=lambda: [])
 
     brand_description: Optional[str] = None
     brand_address: Optional[str] = None
@@ -184,10 +186,6 @@ class Product(ABC):
     sulfite_free: bool = True
     nuts_free: bool = True
 
-    @abstractclassmethod
-    def __init__(self) -> None:
-        pass
-
-    @abstractclassmethod
+    @abc.abstractclassmethod
     def price(self):
         pass
