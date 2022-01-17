@@ -39,3 +39,12 @@ Supermarket-connector is build for python 3.9+.
   * Albert Heijn
   * Jumbo
   * Picnic
+
+## Features
+
+* List all categories
+* List sub-categories of category
+* Find category based on id or name
+* List all products
+* List products by category
+* Give details of product
