@@ -4,12 +4,12 @@
 ![Version](https://img.shields.io/pypi/v/supermarket-connector?label=package%20version)
 ![Downloads](https://img.shields.io/pypi/dm/supermarket-connector)
 ![Status](https://img.shields.io/pypi/status/supermarket-connector)
- 
-Simple api-clients for different supermarket mobile apis. 
+
+Simple api-clients for different supermarket mobile apis.
 
 ```python
 
-from supermarket_connector.nl.albert_heijn.client import Client
+from supermarket_connector.nl.albert_heijn import Client
 
 ah_client = Client()
 
@@ -28,7 +28,7 @@ This api-client allows you to access all data find within the mobile api of the 
 Supermarket-connector is available on PyPI:
 
 ```console
-$ python -m pip install supermarket-connector
+python -m pip install supermarket-connector
 ```
 
 Supermarket-connector is build for python 3.9+.
