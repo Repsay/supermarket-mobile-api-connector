@@ -12,7 +12,8 @@ import requests
 from requests.models import Response
 from supermarket_connector import utils
 from supermarket_connector.models.category import Category
-from supermarket_connector.models.image import Image
+
+# from supermarket_connector.models.image import Image
 from supermarket_connector.models.product import Product
 from unidecode import unidecode
 
@@ -301,6 +302,9 @@ class Client:
 
         def details(self):
             response = self.__client.request("GET", f"15/product/{self.id}", debug_key="product_details")
+
+            if not isinstance(response, dict):
+                raise ValueError("Expected response to be dict")
 
         def price(self):
             if not self.price_current is None:
