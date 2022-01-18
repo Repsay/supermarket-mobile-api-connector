@@ -1,16 +1,15 @@
-from __future__ import annotations
+from typing import Any, Optional
 
-from typing import Optional
+from abc import ABC
+import dataclasses
 
-from abc import ABC, abstractclassmethod
 
-
+@dataclasses.dataclass
 class Category(ABC):
     id: int
-    slug_name: Optional[str]
-    name: Optional[str]
-    nix18: bool
+    slug_name: Optional[str] = None
+    name: Optional[str] = None
+    nix18: bool = False
 
-    @abstractclassmethod
-    def __init__(self) -> None:
-        pass
+    images: list[Any] = dataclasses.field(default_factory=lambda: [])
+    subs: list[Any] = dataclasses.field(default_factory=lambda: [])

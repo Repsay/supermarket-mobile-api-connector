@@ -234,48 +234,50 @@ class Client:
             self,
             client: Client,
             id: Optional[int] = None,
-            slug_name: Optional[str] = None,
             name: Optional[str] = None,
             data: Optional[dict[str, Any]] = None,
         ) -> None:
-            super().__init__()
             self.__client = client
 
-            if data is None and not id is None:
-                self.id = id
-                self.slug_name = slug_name
-                self.name = name
-            elif not data is None:
-                self.image_id = data.get("image_id")
+            if data is None and id is None:
+                raise ValueError("When initilizing category need to have data or ID")
 
+            slug_name = None
+
+            if not data is None:
                 id = data.get("id")
-                if id is None:
-                    raise ValueError("Expected data to have ID")
+                name = data.get("title")
 
-                self.id = int(id)
-                self.name = data.get("name")
-                if not self.name is None:
-                    self.slug_name = unidecode(self.name).lower().replace(",", "").replace("&", "").replace("  ", "-").replace(" ", "-")
-            else:
-                raise ValueError("When initializing category need to have data or id")
+                if not name is None:
+                    slug_name = unidecode(name).lower().replace(",", "").replace("&", "").replace("  ", "-").replace(" ", "-")
 
-            self.subs: list[Client.Category] = []
+            if id is None:
+                raise ValueError("Expected data to have ID")
+
+            id = int(id)
+
+            super().__init__(id, slug_name, name, images=[], subs=[])
 
     class Product(Product):
         def __init__(self, client: Client, id: Optional[int] = None, data: Optional[dict[str, Any]] = None) -> None:
-            super().__init__()
             self.__client = client
 
-            if data is None and not id is None:
-                self.id = id
-            elif not data is None:
+            if data is None and id is None:
+                raise ValueError("When initilizing category need to have data or id")
+
+            if not data is None:
                 id = data.get("id")
+
+            if id is None:
+                raise ValueError("Expected data to have ID")
+
+            id = int(id)
+
+            super().__init__(id)
+
+            if not data is None:
                 decorator_data: list[dict[str, Any]] = data.get("decorators", [])
 
-                if id is None:
-                    raise ValueError("Expected data to have ID")
-
-                self.id = int(id)
                 self.name = data.get("name")
                 self.unit_size = data.get("unit_quantity")
                 self.unit_price_description = data.get("unit_quantity_sub")
@@ -296,8 +298,6 @@ class Client:
                     if decorator.get("type") == "LABEL":
                         if decorator.get("text") != "NIEUW":
                             self.bonus_mechanism = decorator.get("text")
-            else:
-                raise ValueError("When initializing product need to have data or id")
 
         def details(self):
             response = self.__client.request("GET", f"15/product/{self.id}", debug_key="product_details")

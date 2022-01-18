@@ -213,33 +213,35 @@ class Client:
     class Images:
         def __init__(self, client: Client) -> None:
             self.__client = client
-            self.data: list[Client.Image] = []
 
         def process(self, data: list[dict[str, Any]]):
+            temp: list[Client.Image] = []
             for elem in data:
-                self.data.append(self.__client.Image(self.__client, data=elem))
+                temp.append(self.__client.Image(self.__client, data=elem))
 
-            return self.data
+            return temp
 
     class Product(Product):
         def __init__(self, client: Client, id: Optional[int] = None, data: Optional[dict[str, Any]] = None) -> None:
-            super().__init__()
             self.__client = client
 
-            if data is None and not id is None:
-                self.id = id
-            elif not data is None:
-                images_data: list[dict[str, Any]] = data.get("imageInfo", {}).get("primaryView", [])
-                quantity_data: dict[str, Any] = data.get("quantityOptions", [{}])[0]
-                price_data: dict[str, Any] = data.get("prices", {})
-                bonus_data: dict[str, Any] = data.get("promotion", {})
+            if data is None and id is None:
+                raise ValueError("When initilizing product need to have data or ID")
 
+            if not data is None:
                 id = data.get("id")
 
                 if id is None:
                     raise ValueError("Expected data to have ID")
 
-                self.id = id
+            super().__init__(id)
+
+            if not data is None:
+                images_data: list[dict[str, Any]] = data.get("imageInfo", {}).get("primaryView", [])
+                quantity_data: dict[str, Any] = data.get("quantityOptions", [{}])[0]
+                price_data: dict[str, Any] = data.get("prices", {})
+                bonus_data: dict[str, Any] = data.get("promotion", {})
+
                 self.name = data.get("title")
                 self.unit_size = quantity_data.get("unit")
                 self.default_amount = quantity_data.get("defaultAmount")
@@ -315,6 +317,9 @@ class Client:
                 return self.price_raw
 
     class Category(Category):
+        subs: list[Client.Category]
+        images: list[Client.Image]
+
         def __init__(
             self,
             client: Client,
@@ -323,34 +328,28 @@ class Client:
             image: Optional[Client.Image] = None,
             data: Optional[dict[str, Any]] = None,
         ) -> None:
-            super().__init__()
             self.__client = client
 
-            if data is None and not id is None:
-                self.id = id
-                if not name is None:
-                    self.slug_name = unidecode(name).lower().replace(",", "").replace(" ", "-")
-                else:
-                    self.slug_name = None
-                self.name = name
-                self.image = image
-            elif not data is None:
+            if data is None and id is None:
+                raise ValueError("When initilizing category need to have data or ID")
 
+            slug_name = None
+
+            if not data is None:
                 id = data.get("id")
-                if id is None:
-                    raise ValueError("Expected data to have ID")
+                name = data.get("title")
 
-                self.id = int(id)
-                self.name: Optional[str] = data.get("title")
-                if not self.name is None:
-                    self.slug_name = unidecode(self.name).lower().replace(",", "").replace(" ", "-")
-                else:
-                    self.slug_name = None
-                self.image = self.__client.Image(self.__client, url=data.get("imageUrl", ""))
-            else:
-                raise ValueError("When initilizing category need to have data or id")
+                if not name is None:
+                    slug_name = unidecode(name).lower().replace(",", "").replace(" ", "-")
 
-            self.subs: list[Client.Category] = []
+                image = self.__client.Image(self.__client, url=data.get("imageUrl", ""))
+
+            if id is None:
+                raise ValueError("Expected data to have ID")
+
+            id = int(id)
+
+            super().__init__(id, slug_name, name, images=[image], subs=[])
 
         def list_subs(self, recursive: bool = True):
             response = self.__client.request("GET", f"v17/categories", params={"id": self.id})
@@ -414,15 +413,15 @@ class Client:
             super().__init__()
             self.client = client
 
-            if not url is None:
-                self.url = url
-            elif not data is None:
-                self.url = data.get("url")
+            height = None
+            width = None
 
-                if self.url is None:
-                    raise ValueError("Expected image url not to be None")
+            if not data is None:
+                url = data.get("url")
+                height = data.get("height")
+                width = data.get("width")
 
-                self.width = data.get("width")
-                self.height = data.get("height")
-            else:
-                raise ValueError("When initilizing image need to have data or url")
+            if url is None:
+                raise ValueError("Expected image url not to be None")
+
+            super().__init__(url, height, width)
