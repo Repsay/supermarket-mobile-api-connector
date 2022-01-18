@@ -6,7 +6,7 @@ import shutil
 import tempfile
 import typing
 from datetime import date
-from typing import Any, Optional, Union
+from typing import Any, Optional, Union, List, Dict
 
 import requests
 from requests.models import Response
@@ -45,14 +45,14 @@ class Client:
         self,
         method: str,
         end_point: str,
-        headers: dict[str, Any] = {},
-        params: dict[str, Any] = {},
-        request_data: Optional[dict[str, Any]] = None,
+        headers: Dict[str, Any] = {},
+        params: Dict[str, Any] = {},
+        request_data: Optional[Dict[str, Any]] = None,
         timeout: int = 10,
         authorized: bool = True,
         json_: bool = True,
         debug_key: Optional[str] = None,
-    ) -> Union[str, list[Any], dict[Any, Any]]:
+    ) -> Union[str, List[Any], Dict[Any, Any]]:
 
         headers.update(self.DEFAULT_HEADERS)
 
@@ -86,7 +86,7 @@ class Client:
 
         if json_:
             try:
-                response_json: Union[list[Any], dict[Any, Any]] = response.json()
+                response_json: Union[List[Any], Dict[Any, Any]] = response.json()
 
                 if self.debug:
                     if self.debug_fn is None:
@@ -99,7 +99,7 @@ class Client:
                         if os.path.isfile(debug_path):
                             with open(debug_path, "r") as f:
                                 try:
-                                    data: dict[str, Any] = json.load(f)
+                                    data: Dict[str, Any] = json.load(f)
                                     shutil.copyfile(debug_path, debug_path_temp)
                                 except ValueError:
                                     data = {}
@@ -152,7 +152,7 @@ class Client:
     class Categories:
         def __init__(self, client: Client) -> None:
             self.__client = client
-            self.data: dict[int, Client.Category] = {}
+            self.data: Dict[int, Client.Category] = {}
 
         def list(self):
             response = self.__client.request("GET", "mobile-services/v1/product-shelves/categories")
@@ -196,14 +196,14 @@ class Client:
     class Products:
         def __init__(self, client: Client) -> None:
             self.__client = client
-            self.data: dict[int, dict[int, Client.Product]] = {}
+            self.data: Dict[int, Dict[int, Client.Product]] = {}
 
         @typing.overload
-        def list(self) -> dict[int, dict[int, Client.Product]]:
+        def list(self) -> Dict[int, Dict[int, Client.Product]]:
             ...
 
         @typing.overload
-        def list(self, category: Client.Category) -> dict[int, Client.Product]:
+        def list(self, category: Client.Category) -> Dict[int, Client.Product]:
             ...
 
         def list(self, category: Optional[Client.Category] = None):
@@ -264,15 +264,15 @@ class Client:
         def __init__(self, client: Client) -> None:
             self.__client = client
 
-        def process(self, data: list[dict[str, Any]]):
-            temp: list[Client.Image] = []
+        def process(self, data: List[Dict[str, Any]]):
+            temp: List[Client.Image] = []
             for elem in data:
                 temp.append(self.__client.Image(self.__client, data=elem))
 
             return temp
 
     class Product(Product):
-        def __init__(self, client: Client, id: Optional[int] = None, data: Optional[dict[str, Any]] = None) -> None:
+        def __init__(self, client: Client, id: Optional[int] = None, data: Optional[Dict[str, Any]] = None) -> None:
             self.__client = client
 
             if data is None and id is None:
@@ -287,7 +287,7 @@ class Client:
             super().__init__(id)
 
             if not data is None:
-                images_data: list[dict[str, Any]] = data.get("images", [])
+                images_data: List[Dict[str, Any]] = data.get("images", [])
                 start_date_raw = data.get("bonusStartDate")
                 end_date_raw = data.get("bonusEndDate")
                 bonus_type_raw = data.get("promotionType")
@@ -304,7 +304,7 @@ class Client:
                 self.sample = data.get("isSample", False)
                 self.sponsored = data.get("isSponsored", False)
 
-                self.images: list[Client.Image] = self.__client.images.process(images_data)
+                self.images: List[Client.Image] = self.__client.images.process(images_data)
                 self.icons = data.get("propertyIcons", [])
                 self.stickers = data.get("stickers", [])
 
@@ -346,24 +346,24 @@ class Client:
             if not isinstance(response, dict):
                 raise ValueError("Expected value to be dict")
 
-            data: dict[str, Any] = response
-            productCard: dict[str, Any] = data.get("productCard", {})
+            data: Dict[str, Any] = response
+            productCard: Dict[str, Any] = data.get("productCard", {})
             self.subcategory_id = productCard.get("subCategoryId")
             self.description_extra = "\n".join(productCard.get("extraDescriptions", []))
 
-            properties: dict[str, Any] = productCard.get("properties", {})
+            properties: Dict[str, Any] = productCard.get("properties", {})
 
             self.fragrance = properties.get("da_fragrance", [])
 
-            smaak: list[str] = properties.get("np_smaak", [])
+            smaak: List[str] = properties.get("np_smaak", [])
             self.taste = properties.get("da_taste", [])
             self.taste.extend(smaak)
 
-            kleur: list[str] = properties.get("np_kleur", [])
+            kleur: List[str] = properties.get("np_kleur", [])
             self.colour = properties.get("da_colour", [])
             self.colour.extend(kleur)
 
-            druivenras: list[str] = properties.get("np_druivenras", [])
+            druivenras: List[str] = properties.get("np_druivenras", [])
             self.grape = properties.get("da_grape", [])
             self.grape.extend(druivenras)
 
@@ -379,11 +379,11 @@ class Client:
             self.egg_type = properties.get("da_type_of_egg", [])
             self.moments_of_use = properties.get("da_moments_of_use", [])
 
-            maturation: list[str] = properties.get("np_rijping", [])
+            maturation: List[str] = properties.get("np_rijping", [])
             self.maturity = properties.get("da_maturity", [])
             self.maturity.extend(maturation)
 
-            vetgehalte: list[str] = properties.get("np_vetgehalte", [])
+            vetgehalte: List[str] = properties.get("np_vetgehalte", [])
             self.fat_content = properties.get("da_fat_content", [])
             self.fat_content.extend(vetgehalte)
 
@@ -403,14 +403,14 @@ class Client:
             self.coffee_machine_type = properties.get("da_type_of_coffee_machine", [])
             self.bread_type = properties.get("da_type_of_bread", [])
 
-            recommended_usage: list[str] = properties.get("da_recommended_usage", [])
+            recommended_usage: List[str] = properties.get("da_recommended_usage", [])
             self.usage = properties.get("da_usage", [])
             self.usage.extend(recommended_usage)
 
             self.closure_method = properties.get("da_closure_method", [])
             self.tasty_with = properties.get("da_tasty_with", [])
 
-            streek: list[str] = properties.get("np_streek", [])
+            streek: List[str] = properties.get("np_streek", [])
             self.region = properties.get("da_region", [])
             self.region.extend(streek)
 
@@ -519,8 +519,8 @@ class Client:
                 return self.price_raw
 
     class Category(Category):
-        subs: list[Client.Category]
-        images: list[Client.Image]
+        subs: List[Client.Category]
+        images: List[Client.Image]
 
         def __init__(
             self,
@@ -529,8 +529,8 @@ class Client:
             slug_name: Optional[str] = None,
             name: Optional[str] = None,
             nix18: bool = False,
-            images: list[Client.Image] = [],
-            data: Optional[dict[str, Any]] = None,
+            images: List[Client.Image] = [],
+            data: Optional[Dict[str, Any]] = None,
         ) -> None:
             self.__client = client
 
@@ -556,7 +556,7 @@ class Client:
             if not isinstance(response, dict):
                 raise ValueError("Expected response to be dict")
 
-            children: list[dict[str, Any]] = response.get("children", [])
+            children: List[Dict[str, Any]] = response.get("children", [])
 
             for elem in children:
                 cat = self.__client.Category(self.__client, data=elem)
@@ -606,7 +606,7 @@ class Client:
             self,
             client: Client,
             url: Optional[str] = None,
-            data: Optional[dict[str, Any]] = None,
+            data: Optional[Dict[str, Any]] = None,
         ) -> None:
             self.__client = client
 
