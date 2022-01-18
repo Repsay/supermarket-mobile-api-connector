@@ -1,7 +1,7 @@
-from typing import Any
+from typing import Any, Dict
 
 
-def process_type(value: Any, temp: dict[str, Any], get_value: bool = True):
+def process_type(value: Any, temp: Dict[str, Any], get_value: bool = True):
     key = type(value).__name__
 
     if key in temp.keys():
@@ -39,7 +39,7 @@ def process_type(value: Any, temp: dict[str, Any], get_value: bool = True):
     return temp
 
 
-def type_def_dict(elem: dict[str, Any], temp: dict[str, Any], get_value: bool = True):
+def type_def_dict(elem: Dict[str, Any], temp: Dict[str, Any], get_value: bool = True):
     for key, value in elem.items():
         if key in temp.keys():
             temp[key] = process_type(value, temp[key], get_value)

@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any, List, Optional
 
 from abc import ABC
 import dataclasses
@@ -11,5 +11,5 @@ class Category(ABC):
     name: Optional[str] = None
     nix18: bool = False
 
-    images: list[Any] = dataclasses.field(default_factory=lambda: [])
-    subs: list[Any] = dataclasses.field(default_factory=lambda: [])
+    images: List[Any] = dataclasses.field(default_factory=lambda: [])
+    subs: List[Any] = dataclasses.field(default_factory=lambda: [])

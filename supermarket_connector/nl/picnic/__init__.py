@@ -6,7 +6,7 @@ import os
 import shutil
 import tempfile
 import typing
-from typing import Any, Optional, Union
+from typing import Any, Optional, Union, List, Dict
 
 import requests
 from requests.models import Response
@@ -18,11 +18,11 @@ from supermarket_connector.models.product import Product
 from unidecode import unidecode
 
 
-def get_items(client: Client, list_: Optional[list[dict[str, Any]]]) -> dict[int, Client.Product]:
+def get_items(client: Client, list_: Optional[List[Dict[str, Any]]]) -> Dict[int, Client.Product]:
     if list_ is None:
         return {}
 
-    temp: dict[int, Client.Product] = {}
+    temp: Dict[int, Client.Product] = {}
 
     for elem in list_:
         if elem.get("type") == "SINGLE_ARTICLE":
@@ -63,14 +63,14 @@ class Client:
         self,
         method: str,
         end_point: str,
-        headers: dict[str, Any] = {},
-        params: dict[str, Any] = {},
-        request_data: dict[str, Any] = {},
+        headers: Dict[str, Any] = {},
+        params: Dict[str, Any] = {},
+        request_data: Dict[str, Any] = {},
         timeout: int = 10,
         authorized: bool = True,
         json_: bool = True,
         debug_key: Optional[str] = None,
-    ) -> Union[str, list[Any], dict[Any, Any]]:
+    ) -> Union[str, List[Any], Dict[Any, Any]]:
 
         headers.update(self.DEFAULT_HEADERS)
 
@@ -100,7 +100,7 @@ class Client:
 
         if json_:
             try:
-                response_json: Union[list[Any], dict[Any, Any]] = response.json()
+                response_json: Union[List[Any], Dict[Any, Any]] = response.json()
 
                 if self.debug:
                     if self.debug_fn is None:
@@ -113,7 +113,7 @@ class Client:
                         if os.path.isfile(debug_path):
                             with open(debug_path, "r") as f:
                                 try:
-                                    data: dict[str, Any] = json.load(f)
+                                    data: Dict[str, Any] = json.load(f)
                                     shutil.copyfile(debug_path, debug_path_temp)
                                 except ValueError:
                                     data = {}
@@ -159,7 +159,7 @@ class Client:
     class Categories:
         def __init__(self, client: Client) -> None:
             self.__client = client
-            self.data: dict[int, Client.Category] = {}
+            self.data: Dict[int, Client.Category] = {}
 
         def list(self, depth: int = 0):
             response = self.__client.request("GET", "15/my_store", params={"depth": depth})
@@ -167,7 +167,7 @@ class Client:
             if not isinstance(response, dict):
                 raise ValueError("Response is not in right format")
 
-            catalog: list[dict[str, Any]] = response.get("catalog", [])
+            catalog: List[Dict[str, Any]] = response.get("catalog", [])
 
             for elem in catalog:
                 id: Optional[str] = elem.get("id")
@@ -193,14 +193,14 @@ class Client:
     class Products:
         def __init__(self, client: Client) -> None:
             self.__client = client
-            self.data: dict[int, dict[int, Client.Product]] = {}
+            self.data: Dict[int, Dict[int, Client.Product]] = {}
 
         @typing.overload
-        def list(self) -> dict[int, dict[int, Client.Product]]:
+        def list(self) -> Dict[int, Dict[int, Client.Product]]:
             ...
 
         @typing.overload
-        def list(self, category: Client.Category) -> dict[int, Client.Product]:
+        def list(self, category: Client.Category) -> Dict[int, Client.Product]:
             ...
 
         def list(self, category: Optional[Client.Category] = None):
@@ -209,7 +209,7 @@ class Client:
                 if not isinstance(response, dict):
                     raise ValueError("Expected dict")
 
-                catalog: list[dict[str, Any]] = response.get("catalog", [])
+                catalog: List[Dict[str, Any]] = response.get("catalog", [])
 
                 for key in self.__client.categories.list().keys():
                     if not key in self.data.keys():
@@ -236,7 +236,7 @@ class Client:
             client: Client,
             id: Optional[int] = None,
             name: Optional[str] = None,
-            data: Optional[dict[str, Any]] = None,
+            data: Optional[Dict[str, Any]] = None,
         ) -> None:
             self.__client = client
 
@@ -260,7 +260,7 @@ class Client:
             super().__init__(id, slug_name, name, images=[], subs=[])
 
     class Product(Product):
-        def __init__(self, client: Client, id: Optional[int] = None, data: Optional[dict[str, Any]] = None) -> None:
+        def __init__(self, client: Client, id: Optional[int] = None, data: Optional[Dict[str, Any]] = None) -> None:
             self.__client = client
 
             if data is None and id is None:
@@ -277,7 +277,7 @@ class Client:
             super().__init__(id)
 
             if not data is None:
-                decorator_data: list[dict[str, Any]] = data.get("decorators", [])
+                decorator_data: List[Dict[str, Any]] = data.get("decorators", [])
 
                 self.name = data.get("name")
                 self.unit_size = data.get("unit_quantity")
