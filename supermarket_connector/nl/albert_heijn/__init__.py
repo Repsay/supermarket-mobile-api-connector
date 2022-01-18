@@ -263,22 +263,30 @@ class Client:
     class Images:
         def __init__(self, client: Client) -> None:
             self.__client = client
-            self.data: list[Client.Image] = []
 
         def process(self, data: list[dict[str, Any]]):
+            temp: list[Client.Image] = []
             for elem in data:
-                self.data.append(self.__client.Image(self.__client, data=elem))
+                temp.append(self.__client.Image(self.__client, data=elem))
 
-            return self.data
+            return temp
 
     class Product(Product):
         def __init__(self, client: Client, id: Optional[int] = None, data: Optional[dict[str, Any]] = None) -> None:
-            super().__init__()
             self.__client = client
 
-            if data is None and not id is None:
-                self.id = id
-            elif not data is None:
+            if data is None and id is None:
+                raise ValueError("When initilizing category need to have data or id")
+
+            if not data is None:
+                id = data.get("webshopId")
+
+                if id is None:
+                    raise ValueError("Expected data to have ID")
+
+            super().__init__(id)
+
+            if not data is None:
                 images_data: list[dict[str, Any]] = data.get("images", [])
                 start_date_raw = data.get("bonusStartDate")
                 end_date_raw = data.get("bonusEndDate")
@@ -286,12 +294,6 @@ class Client:
                 discount_type_raw = data.get("discountType")
                 segment_type_raw = data.get("segmentType")
 
-                id = data.get("webshopId")
-
-                if id is None:
-                    raise ValueError("Expected data to have ID")
-
-                self.id = id
                 self.name = data.get("title")
                 self.brand = data.get("brand")
                 self.shop_type = ShopType[data.get("shopType", "UNKNOWN")]
@@ -337,9 +339,6 @@ class Client:
 
                 self.bundle = data.get("isVirtualBundle", False)
                 self.bundle_items = data.get("virtualBundleItems", [])
-
-            else:
-                raise ValueError("When initilizing category need to have data or id")
 
         def details(self):
             response = self.__client.request("GET", f"mobile-services/product/detail/v4/fir/{self.id}", debug_key="product_details")
@@ -520,6 +519,9 @@ class Client:
                 return self.price_raw
 
     class Category(Category):
+        subs: list[Client.Category]
+        images: list[Client.Image]
+
         def __init__(
             self,
             client: Client,
@@ -530,31 +532,23 @@ class Client:
             images: list[Client.Image] = [],
             data: Optional[dict[str, Any]] = None,
         ) -> None:
-            super().__init__()
             self.__client = client
 
-            if data is None and not id is None:
-                self.id = id
-                self.slug_name = slug_name
-                self.name = name
-                self.nix18 = nix18
-                self.images = images
-            elif not data is None:
-                images_data: list[dict[str, Any]] = data.get("images", [])
-
-                id = data.get("id")
-                if id is None:
-                    raise ValueError("Expected data to have ID")
-
-                self.id = id
-                self.slug_name: Optional[str] = data.get("slugifiedName")
-                self.name: Optional[str] = data.get("name")
-                self.nix18: bool = data.get("nix18", False)
-                self.images = self.__client.images.process(images_data)
-            else:
+            if data is None and id is None:
                 raise ValueError("When initilizing category need to have data or id")
 
-            self.subs: list[Client.Category] = []
+            if not data is None:
+                id = data.get("id")
+
+                slug_name = data.get("slugifiedName")
+                name = data.get("name")
+                nix18 = data.get("nix18", False)
+                images = self.__client.images.process(data.get("images", []))
+
+            if id is None:
+                raise ValueError("Expected data to have ID")
+
+            super().__init__(id, slug_name, name, nix18, images, [])
 
         def list_subs(self, recursive: bool = True):
             response = self.__client.request("GET", f"mobile-services/v1/product-shelves/categories/{self.id}/sub-categories", debug_key="list_subcategories")
@@ -614,18 +608,17 @@ class Client:
             url: Optional[str] = None,
             data: Optional[dict[str, Any]] = None,
         ) -> None:
-            super().__init__()
             self.__client = client
 
-            if not url is None:
-                self.url = url
-            elif not data is None:
-                self.url = data.get("url")
+            height = None
+            width = None
 
-                if self.url is None:
-                    raise ValueError("Expected image url not to be None")
+            if not data is None:
+                url = data.get("url")
+                height = data.get("height")
+                width = data.get("width")
 
-                self.width = data.get("width")
-                self.height = data.get("height")
-            else:
-                raise ValueError("When initilizing category need to have data or url")
+            if url is None:
+                raise ValueError("Expected image url not to be None")
+
+            super().__init__(url, height, width)
