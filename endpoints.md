@@ -163,7 +163,7 @@ OTHER
 * v8/order/{orderId}/details-grouped-by-taxonomy
 * versioncheck/v2/{name}/{code}/check
 
-## Jumbo
+### Jumbo
 
 **BASE_URL:** `https://mobileapi.jumbo.com/`
 

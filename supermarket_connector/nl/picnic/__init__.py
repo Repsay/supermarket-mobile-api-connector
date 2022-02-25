@@ -18,7 +18,7 @@ from supermarket_connector.models.product import Product
 from unidecode import unidecode
 
 
-def get_items(client: Client, list_: Optional[List[Dict[str, Any]]]) -> Dict[int, Client.Product]:
+def get_items(client: Client, list_: Optional[List[Dict[str, Any]]], cat_id: Union[int, str]) -> Dict[int, Client.Product]:
     if list_ is None:
         return {}
 
@@ -26,11 +26,11 @@ def get_items(client: Client, list_: Optional[List[Dict[str, Any]]]) -> Dict[int
 
     for elem in list_:
         if elem.get("type") == "SINGLE_ARTICLE":
-            product = client.Product(client, data=elem)
+            product = client.Product(client, data=elem, cat_id=cat_id)
             if not product is None:
                 temp[product.id] = product
 
-        temp.update(get_items(client, elem.get("items")))
+        temp.update(get_items(client, elem.get("items"), cat_id))
 
     return temp
 
@@ -159,7 +159,7 @@ class Client:
     class Categories:
         def __init__(self, client: Client) -> None:
             self.__client = client
-            self.data: Dict[int, Client.Category] = {}
+            self.data: Dict[Union[int, str], Client.Category] = {}
 
         def list(self, depth: int = 0):
             response = self.__client.request("GET", "15/my_store", params={"depth": depth})
@@ -193,10 +193,10 @@ class Client:
     class Products:
         def __init__(self, client: Client) -> None:
             self.__client = client
-            self.data: Dict[int, Dict[int, Client.Product]] = {}
+            self.data: Dict[Union[int, str], Dict[int, Client.Product]] = {}
 
         @typing.overload
-        def list(self) -> Dict[int, Dict[int, Client.Product]]:
+        def list(self) -> Dict[Union[int, str], Dict[int, Client.Product]]:
             ...
 
         @typing.overload
@@ -220,11 +220,11 @@ class Client:
                     for elem in catalog:
                         if elem.get("id") == str(key):
                             if elem.get("type") == "SINGLE_ARTICLE":
-                                product = self.__client.Product(self.__client, data=elem)
+                                product = self.__client.Product(self.__client, data=elem, cat_id=key)
                                 if not product is None:
                                     self.data[key][product.id] = product
                             else:
-                                self.data[key] = get_items(self.__client, elem.get("items"))
+                                self.data[key] = get_items(self.__client, elem.get("items"), key)
 
                 return self.data
             else:
@@ -247,7 +247,7 @@ class Client:
 
             if not data is None:
                 id = data.get("id")
-                name = data.get("title")
+                name = data.get("name")
 
                 if not name is None:
                     slug_name = unidecode(name).lower().replace(",", "").replace("&", "").replace("  ", "-").replace(" ", "-")
@@ -260,7 +260,7 @@ class Client:
             super().__init__(id, slug_name, name, images=[], subs=[])
 
     class Product(Product):
-        def __init__(self, client: Client, id: Optional[int] = None, data: Optional[Dict[str, Any]] = None) -> None:
+        def __init__(self, client: Client, id: Optional[int] = None, data: Optional[Dict[str, Any]] = None, cat_id: Optional[Union[int, str]] = None) -> None:
             self.__client = client
 
             if data is None and id is None:
@@ -275,6 +275,8 @@ class Client:
             id = int(id)
 
             super().__init__(id)
+
+            self.category_id = cat_id
 
             if not data is None:
                 decorator_data: List[Dict[str, Any]] = data.get("decorators", [])
@@ -297,7 +299,7 @@ class Client:
                             self.price_current = self.price_current / 100
 
                     if decorator.get("type") == "LABEL":
-                        if decorator.get("text") != "NIEUW":
+                        if decorator.get("text") != "NIEUW" and decorator.get("text") != "VERNIEUWD":
                             self.bonus_mechanism = decorator.get("text")
 
         def details(self):
@@ -305,6 +307,12 @@ class Client:
 
             if not isinstance(response, dict):
                 raise ValueError("Expected response to be dict")
+
+            data: Dict[str, Any] = response.get("product_details", {})
+            # alergy_data: List[Dict[str, Any]] = data.get('tags')
+            self.brand_description = data.get("label_holder")
+
+            return self
 
         def price(self):
             if not self.price_current is None:

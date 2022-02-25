@@ -6,8 +6,9 @@ import os
 import shutil
 import tempfile
 import typing
+from fp.fp import FreeProxy
 from datetime import date
-from typing import Any, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 import requests
 from requests.models import Response
@@ -21,31 +22,47 @@ from unidecode import unidecode
 
 class Client:
     BASE_URL = "https://mobileapi.jumbo.com/"
-    DEFAULT_HEADERS = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:81.0) Gecko/20100101 Firefox/81.0"}
+    DEFAULT_HEADERS = {
+        "User-Agent": "Mozilla/5.0 (Linux; Android 11; M2101K7AG) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.45 Mobile Safari/537.36",
+        "Cache-Control": "no-cache",
+        "Content-Type": "application/json",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Accept": "*/*",
+        "Connection": "keep-alive",
+    }
     TEMP_DIR = os.path.join(tempfile.gettempdir(), "Supermarket-Connector", "Debug", "JUMBO")
 
     def request(
-        self, method: str, end_point: str, headers: dict[str, Any] = {}, params: dict[str, Any] = {}, timeout: int = 10, json_: bool = True, debug_key: Optional[str] = None
-    ) -> Union[list[Any], dict[Any, Any], str]:
+        self, method: str, end_point: str, headers: Dict[str, Any] = {}, params: Dict[str, Any] = {}, timeout: int = 10, json_: bool = True, debug_key: Optional[str] = None
+    ) -> Union[List[Any], Dict[Any, Any], str]:
 
         headers.update(self.DEFAULT_HEADERS)
+        counter_tries = 0
+        new_proxy = False
 
         while True:
             try:
-                response: Response = requests.request(method, f"{self.BASE_URL}{end_point}", params=params, headers=headers, timeout=timeout)
-            except Exception:
+                if new_proxy:
+                    new_proxy = False
+                    self.__proxy = FreeProxy().get()
+
+                counter_tries += 1
+                response: Response = requests.request(method, f"{self.BASE_URL}{end_point}", params=params, headers=headers, timeout=timeout, proxies={"http": self.__proxy})
+
+                if not response.ok:
+                    self.__proxy = FreeProxy().get()
+                    print(f"Connection error: {response.status_code} try: {counter_tries}", end="\r")
+                    continue
+            except Exception as e:
+                print(e)
+                new_proxy = True
                 continue
             else:
                 break
 
-        if not response.ok:
-            if self.debug:
-                print(f"Connection error: {response.status_code}")
-            return self.request(method, end_point, headers, params, timeout, json_, debug_key)
-
         if json_:
             try:
-                response_json: Union[list[Any], dict[Any, Any]] = response.json()
+                response_json: Union[List[Any], Dict[Any, Any]] = response.json()
 
                 if self.debug:
                     if self.debug_fn is None:
@@ -106,11 +123,12 @@ class Client:
         self.debug = debug
         self.debug_fn = debug_fn
         self.debug_value = debug_value
+        self.__proxy = FreeProxy().get()
 
     class Categories:
         def __init__(self, client: Client) -> None:
             self.__client = client
-            self.data: dict[int, Client.Category] = {}
+            self.data: Dict[Union[int, str], Client.Category] = {}
 
         def list(self):
             response = self.__client.request("GET", "v17/categories")
@@ -118,7 +136,7 @@ class Client:
             if not isinstance(response, dict):
                 raise ValueError("Reponse is not in right format")
 
-            data: list[dict[Any, Any]] = response.get("categories", {}).get("data", [])
+            data: List[Dict[Any, Any]] = response.get("categories", {}).get("data", [])
 
             for elem in data:
                 category = self.__client.Category(self.__client, data=elem)
@@ -154,14 +172,14 @@ class Client:
     class Products:
         def __init__(self, client: Client) -> None:
             self.__client = client
-            self.data: dict[int, dict[str, Client.Product]] = {}
+            self.data: Dict[Union[int, str], Dict[str, Client.Product]] = {}
 
         @typing.overload
-        def list(self) -> dict[int, dict[str, Client.Product]]:
+        def list(self) -> Dict[Union[int, str], Dict[str, Client.Product]]:
             ...
 
         @typing.overload
-        def list(self, category: Client.Category) -> dict[str, Client.Product]:
+        def list(self, category: Client.Category) -> Dict[str, Client.Product]:
             ...
 
         def list(self, category: Optional[Client.Category] = None):
@@ -184,6 +202,7 @@ class Client:
                 max_size = 30
 
                 while True:
+                    print(f"{page}/{total_pages}", end="\r")
                     if self.data.get(category.id) is None:
                         self.data[category.id] = {}
 
@@ -195,7 +214,7 @@ class Client:
                     if total_pages == 0:
                         total_pages: int = math.ceil(response.get("products", {}).get("total", 30) / max_size)
 
-                    data: list[dict[Any, Any]] = response.get("products", {}).get("data", [])
+                    data: List[Dict[Any, Any]] = response.get("products", {}).get("data", [])
 
                     for product in data:
                         temp_ = self.__client.Product(self.__client, data=product)
@@ -214,15 +233,15 @@ class Client:
         def __init__(self, client: Client) -> None:
             self.__client = client
 
-        def process(self, data: list[dict[str, Any]]):
-            temp: list[Client.Image] = []
+        def process(self, data: List[Dict[str, Any]]):
+            temp: List[Client.Image] = []
             for elem in data:
                 temp.append(self.__client.Image(self.__client, data=elem))
 
             return temp
 
     class Product(Product):
-        def __init__(self, client: Client, id: Optional[int] = None, data: Optional[dict[str, Any]] = None) -> None:
+        def __init__(self, client: Client, id: Optional[int] = None, data: Optional[Dict[str, Any]] = None) -> None:
             self.__client = client
 
             if data is None and id is None:
@@ -237,10 +256,10 @@ class Client:
             super().__init__(id)
 
             if not data is None:
-                images_data: list[dict[str, Any]] = data.get("imageInfo", {}).get("primaryView", [])
-                quantity_data: dict[str, Any] = data.get("quantityOptions", [{}])[0]
-                price_data: dict[str, Any] = data.get("prices", {})
-                bonus_data: dict[str, Any] = data.get("promotion", {})
+                images_data: List[Dict[str, Any]] = data.get("imageInfo", {}).get("primaryView", [])
+                quantity_data: Dict[str, Any] = data.get("quantityOptions", [{}])[0]
+                price_data: Dict[str, Any] = data.get("prices", {})
+                bonus_data: Dict[str, Any] = data.get("promotion", {})
 
                 self.name = data.get("title")
                 self.unit_size = quantity_data.get("unit")
@@ -269,8 +288,11 @@ class Client:
                 self.quantity = data.get("quantity")
                 self.images = self.__client.images.process(images_data)
 
-                self.bonus_start_date = date.fromtimestamp(bonus_data.get("fromDate", 0))
-                self.bonus_end_date = date.fromtimestamp(bonus_data.get("toDate", 0))
+                start_date = bonus_data.get("fromDate")
+                end_date = bonus_data.get("toDate")
+
+                self.bonus_start_date = date.fromtimestamp(int(start_date / 1000)) if not start_date is None else None
+                self.bonus_end_date = date.fromtimestamp(int(end_date / 1000)) if not end_date is None else None
                 self.bonus_period_description = bonus_data.get("validityPeriod")
                 self.bonus_segment_description = bonus_data.get("summary")
                 self.bonus_mechanism = bonus_data.get("tags", [{}])[0].get("text")
@@ -290,10 +312,10 @@ class Client:
             if not isinstance(response, dict):
                 raise ValueError("Expected value to be dict")
 
-            data: dict[str, Any] = response.get("product", {})
-            productCard: dict[str, Any] = data.get("data", {})
-            brand_data: dict[str, Any] = productCard.get("brandInfo", {})
-            # alergy_data: list[str] = productCard.get("allergyText", "").split(",")
+            data: Dict[str, Any] = response.get("product", {})
+            productCard: Dict[str, Any] = data.get("data", {})
+            brand_data: Dict[str, Any] = productCard.get("brandInfo", {})
+            # alergy_data: List[str] = productCard.get("allergyText", "").split(",")
 
             self.category = productCard.get("topLevelCategory")
             self.category_id = productCard.get("topLevelCategoryId")
@@ -317,8 +339,8 @@ class Client:
                 return self.price_raw
 
     class Category(Category):
-        subs: list[Client.Category]
-        images: list[Client.Image]
+        subs: List[Client.Category]
+        images: List[Client.Image]
 
         def __init__(
             self,
@@ -326,7 +348,7 @@ class Client:
             id: Optional[int] = None,
             name: Optional[str] = None,
             image: Optional[Client.Image] = None,
-            data: Optional[dict[str, Any]] = None,
+            data: Optional[Dict[str, Any]] = None,
         ) -> None:
             self.__client = client
 
@@ -408,7 +430,7 @@ class Client:
             self,
             client: Client,
             url: Optional[str] = None,
-            data: Optional[dict[str, Any]] = None,
+            data: Optional[Dict[str, Any]] = None,
         ) -> None:
             super().__init__()
             self.client = client
