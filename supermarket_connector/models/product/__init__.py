@@ -1,4 +1,4 @@
-from typing import Any, Optional, List
+from typing import Any, Optional, List, Union
 from supermarket_connector.enums import DiscountType, ProductAvailabilityStatus, BonusType, ProductType, SegmentType, ShopType
 
 from datetime import date
@@ -16,7 +16,7 @@ class Product(ABC):
     type: Optional[ProductType] = None
     shop_type: Optional[ShopType] = None
     category: Optional[str] = None
-    category_id: Optional[str] = None
+    category_id: Optional[Union[str, int]] = None
     subcategory: Optional[str] = None
     subcategory_id: Optional[str] = None
     nix18: bool = False

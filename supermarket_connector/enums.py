@@ -43,6 +43,7 @@ class SegmentType(Enum):
     AHOO = auto()
     ETOO = auto()
     GAOO = auto()
+    BUNDEL = auto()
     UNKNOWN = auto()
 
 
