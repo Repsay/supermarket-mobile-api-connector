@@ -146,15 +146,15 @@ class Client:
 
             return self.data
 
-        def get(self, id: Optional[int] = None, name: Optional[str] = None):
+        def get(self, id: Optional[Union[int, str]] = None, name: Optional[str] = None):
             if not id is None:
                 if id in self.data.keys():
-                    self.data[id]
+                    return self.data[id]
 
                 self.list()
 
                 if id in self.data.keys():
-                    self.data[id]
+                    return self.data[id]
 
             elif not name is None:
                 for category in self.data.values():
@@ -345,7 +345,7 @@ class Client:
         def __init__(
             self,
             client: Client,
-            id: Optional[int] = None,
+            id: Optional[Union[int, str]] = None,
             name: Optional[str] = None,
             image: Optional[Client.Image] = None,
             data: Optional[Dict[str, Any]] = None,
@@ -369,7 +369,8 @@ class Client:
             if id is None:
                 raise ValueError("Expected data to have ID")
 
-            id = int(id)
+            if id.isdigit():
+                id = int(id)
 
             super().__init__(id, slug_name, name, images=[image], subs=[])
 
@@ -390,7 +391,7 @@ class Client:
 
             return self.subs
 
-        def lookup(self, id: Optional[int] = None, name: Optional[str] = None) -> Optional[Client.Category]:
+        def lookup(self, id: Optional[Union[int, str]] = None, name: Optional[str] = None) -> Optional[Client.Category]:
             if not id is None:
                 if self.id == id:
                     return self

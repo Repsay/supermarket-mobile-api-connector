@@ -19,8 +19,6 @@ from supermarket_connector.nl.albert_heijn import errors
 
 
 class Client:
-    """Description of Client"""
-
     BASE_URL = "https://api.ah.nl/"
     DEFAULT_HEADERS = {
         "User-Agent": "android/6.29.3 Model/phone Android/7.0-API24",
@@ -29,6 +27,7 @@ class Client:
         "Content-Type": "application/json",
         "Accept-Encoding": "gzip, deflate, br",
         "Accept": "*/*",
+        "x-application": "AHWEBSHOP",
         "Connection": "keep-alive",
     }
     TEMP_DIR = os.path.join(tempfile.gettempdir(), "Supermarket-Connector", "Debug", "AH")
@@ -36,16 +35,6 @@ class Client:
     access_token: Optional[str] = None
 
     def get_anonymous_access_token(self) -> Optional[str]:
-        """
-        The get_anonymous_access_token function returns an anonymous access token.
-
-        :returns: A string containing the access token, or None if no anonymous access token is available.
-
-        :param self: Used to access the instance of the class.
-        :return: a string.
-
-        :doc-author: Trelent
-        """
         response = self.request("POST", "mobile-auth/v1/auth/token/anonymous", request_data={"clientId": "appie"}, authorized=False)
 
         if not isinstance(response, dict):
@@ -65,30 +54,6 @@ class Client:
         json_: bool = True,
         debug_key: Optional[str] = None,
     ) -> Union[str, List[Any], Dict[Any, Any]]:
-        """
-        The request function is used to make requests to the API.
-        It takes in a method, end_point, headers (optional), params (optional), request_data (optional) and timeout(default 10 seconds).
-        If authorized is True then it will add an Authorization header with the access token. If json is true then it will try to parse the response as JSON.
-
-        :param self: Used to access the instance variables of the class.
-        :param method:str: Used to specify the HTTP method.
-        :param end_point:str: Used to determine the end point to which the request will be sent.
-        :param headers:Optional[Dict[str: Used to set the headers of the request.
-        :param Any]]=None: Used to make the function compatible with both Python 2 and 3.
-        :param params:Optional[Dict[str: Used to indicate that the params parameter is optional.
-        :param Any]]=None: Used to make the function return None if no data is returned.
-        :param request_data:Optional[Dict[str: Used to send data to the server.
-        :param Any]]=None: Used to make the function call compatible with both Python 2 and 3.
-        :param timeout:int=10: Used to set the timeout for all requests.
-        :param authorized:bool=True: Used to indicate that the request is authorized.
-        :param json_:bool=True: Used to determine if the response should be returned as a JSON object or not.
-        :param debug_key:Optional[str]=None: Used to debug the response of a request.
-        :param : Used to determine if the response is a list or a dictionary.
-        :return: a response object, which is a dictionary.
-
-        :doc-author: Trelent
-        """
-
         if headers is None:
             headers = {}
 
@@ -179,18 +144,6 @@ class Client:
         debug_fn: Optional[str] = None,
         debug_value: bool = True,
     ) -> None:
-        """
-        The __init__ function is called when a class is instantiated.
-        It initializes the attributes of the class, sets up any default behavior, and runs any other code necessary to do this.
-
-        :param self: Used to access the instance of the class.
-        :param debug:bool=False: Used to turn off debugging.
-        :param debug_fn:Optional[str]=None: Used to specify a filename to be used to debug when the debug_value is True.
-        :param debug_value:bool=True: Used to enable/disable the debug mode storing values in the file
-        :return: None.
-
-        :doc-author: Trelent
-        """
         if not os.path.isdir(self.TEMP_DIR):
             os.makedirs(self.TEMP_DIR)
 
@@ -203,41 +156,11 @@ class Client:
         self.get_anonymous_access_token()
 
     class Categories:
-        """
-        Description of Categories
-
-        Attributes:
-            __client (type):
-
-        Args:
-            client (Client):
-
-        """
-
         def __init__(self, client: Client) -> None:
-            """
-            The __init__ function is called when a new instance of the class is created.
-            The __init__ function receives the arguments passed to the class constructor as its own arguments.
-            In this case, we are receiving a reference to an object of type Client and storing it in our instance variable self._client.
-
-            :param self: Used to distinguish the instance of the class being created.
-            :param client:Client: Used to access the client object.
-            :return: None.
-
-            :doc-author: Trelent
-            """
             self.__client = client
             self.data: Dict[Union[int, str], Client.Category] = {}
 
         def list(self):
-            """
-            The list function returns a list of all the categories in the system.
-
-            :param self: Used to access the instance variables of the class.
-            :return: a list of categories.
-
-            :doc-author: Trelent
-            """
             response = self.__client.request("GET", "mobile-services/v1/product-shelves/categories")
 
             if not isinstance(response, list):
@@ -254,23 +177,6 @@ class Client:
             return self.data
 
         def get(self, id: Optional[int] = None, name: Optional[str] = None):
-            """
-            The get function returns a category object based on the id or name.
-
-            Parameters
-            ----------
-            id : int, optional
-                The id of the category to return. If not specified, then name must be specified.  Default is None.
-            name : str, optional
-                The name of the category to return. If not specified, then id must be specified. Default is None.
-
-            :param self: Used to access the instance of the class.
-            :param id:Optional[int]=None: Used to indicate that the parameter is optional.
-            :param name:Optional[str]=None: Used to indicate that the parameter is optional.
-            :return: the Category object with the given id or name.
-
-            :doc-author: Trelent
-            """
             if not id is None:
                 if id in self.data.keys():
                     self.data[id]
@@ -294,29 +200,7 @@ class Client:
             return None
 
     class Products:
-        """
-        Description of Products
-
-        Attributes:
-            __client (type):
-
-        Args:
-            client (Client):
-
-        """
-
         def __init__(self, client: Client) -> None:
-            """
-            The __init__ function is called when a new instance of the class is created.
-            The __init__ function receives the arguments passed to the class constructor as its own arguments.
-            In this case, we are receiving a reference to an object of type Client and storing it in our instance variable self._client.
-
-            :param self: Used to distinguish the instance of the class being created.
-            :param client:Client: Used to access the client object.
-            :return: None.
-
-            :doc-author: Trelent
-            """
             self.__client = client
             self.data: Dict[Union[int, str], Dict[int, Client.Product]] = {}
 
@@ -329,15 +213,6 @@ class Client:
             ...
 
         def list(self, category: Optional[Client.Category] = None):
-            """
-            The list function is used to list all products in a given category.
-
-            :param self: Used to access the instance of the class.
-            :param category:Optional[Client.Category]=None: Used to specify the category to list.
-            :return: a dictionary of lists containing the products.
-
-            :doc-author: Trelent
-            """
             if category is None:
                 old_file_name = None
                 for category in self.__client.categories.list().values():
@@ -392,43 +267,10 @@ class Client:
                 return self.data[category.id]
 
     class Images:
-        """
-        Description of Images
-
-        Attributes:
-            __client (type):
-
-        Args:
-            client (Client):
-
-        """
-
         def __init__(self, client: Client) -> None:
-            """
-            The __init__ function is called when an instance of the class is created.
-            It initializes all of the variables in a class and prepares them for use.
-
-            :param self: Used to distinguish the instance of the class being created from other instances.
-            :param client:Client: Used to connect to the server.
-            :return: self.
-
-            :doc-author: Trelent
-            """
             self.__client = client
 
         def process(self, data: List[Dict[str, Any]]):
-            """
-            The process function is the main function of the class. It is responsible for taking in a list of dictionaries and
-            returning a list of Image objects. The process function iterates through each dictionary, creates an Image object from
-            each one, and appends it to a list which is then returned.
-
-            :param self: Used to refer to the instance of the class.
-            :param data:List[Dict[str: Used to pass the data to the process function.
-            :param Any]]: Used to tell the type checker that it should.
-            :return: a list of Image objects.
-
-            :doc-author: Trelent
-            """
             temp: List[Client.Image] = []
             for elem in data:
                 temp.append(self.__client.Image(self.__client, data=elem))
@@ -436,74 +278,7 @@ class Client:
             return temp
 
     class Product(Product):
-        """
-        Description of Product
-
-        Attributes:
-            __client (type):
-            name (type):
-            brand (type):
-            shop_type (type):
-            category (type):
-            subcategory (type):
-            nix18 (type):
-            nutriscore (type):
-            sample (type):
-            sponsored (type):
-            icons (type):
-            stickers (type):
-            description (type):
-            description_html (type):
-            description_extra (type):
-            price_raw (type):
-            price_current (type):
-            unit_price_description (type):
-            unit_size (type):
-            order_availability (type):
-            order_availability_description (type):
-            available_online (type):
-            orderable (type):
-            bonus (type):
-            bonus_price (type):
-            bonus_infinite (type):
-            bonus_start_date (type):
-            bonus_end_date (type):
-            bonus_type (type):
-            bonus_mechanism (type):
-            bonus_period_description (type):
-            stapel_bonus (type):
-            discount_type (type):
-            segment_type (type):
-            bonus_segment_id (type):
-            bonus_segment_description (type):
-            bundle (type):
-            bundle_items (type):
-
-        Inheritance:
-            Product:
-
-        Args:
-            client (Client):
-            id (Optional[int]=None,data:Optional[Dict[str,Any]]=None):
-
-        """
-
         def __init__(self, client: Client, id: Optional[int] = None, data: Optional[Dict[str, Any]] = None) -> None:
-            """
-            The __init__ function is called when a new instance of the class is created.
-            It initializes all the variables and does any setup work that is required to make
-            the class work. In this case, it sets up the client variable which will be used by
-            all other functions in this class.
-
-            :param self: Used to distinguish between the class and instance methods.
-            :param client:Client: Used to access the client's API.
-            :param id:Optional[int]=None: Used to tell the constructor that we are creating a new object.
-            :param data:Optional[Dict[str: Used to allow the class to be initilized without data.
-            :param Any]]=None: Used to force the return type of a function to be Optional[Dict[str, Any]].
-            :return: nothing.
-
-            :doc-author: Trelent
-            """
             self.__client = client
 
             if data is None and id is None:
