@@ -46,7 +46,7 @@ class Client:
 
         headers.update(self.DEFAULT_HEADERS)
 
-        counter_tries = 0
+        counter_tries: int = 0
 
         while True:
             try:
@@ -56,6 +56,8 @@ class Client:
                 if not response.ok:
                     print(f"Connection error: {response.status_code} try: {counter_tries}", end="\r")
                     if response.status_code == 404:
+                        return {}
+                    if counter_tries == 40: #type: ignore
                         return {}
                     continue
             except Exception as e:
@@ -251,10 +253,16 @@ class Client:
                 self.description = data.get("shortDescription")
 
         def details(self):
-            print("No details to to show because all are available in the basic info")
+            # response = self.__client.request("GET", f"articles/{self.id}.json", debug_key="product_details")
+
+            # if not isinstance(response, dict):
+            #     raise ValueError("Expected response to be dict")
+
+            print("Not necessary because all data is already in products.json")
+
             return self
 
-        def price(self):
+        def price(self): #type: ignore
             if not self.price_current is None:
                 return self.price_current
             return self.price_raw
