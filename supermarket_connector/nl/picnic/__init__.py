@@ -303,14 +303,31 @@ class Client:
                             self.bonus_mechanism = decorator.get("text")
 
         def details(self):
-            response = self.__client.request("GET", f"15/product/{self.id}", debug_key="product_details")
+            response = self.__client.request("GET", f"15/articles/{self.id}", debug_key="product_details")
 
             if not isinstance(response, dict):
                 raise ValueError("Expected response to be dict")
 
-            data: Dict[str, Any] = response.get("product_details", {})
-            # alergy_data: List[Dict[str, Any]] = data.get('tags')
-            self.brand_description = data.get("label_holder")
+            data: Dict[str, Any] = response
+            self.description = data.get("description", {}).get("main")
+            extension = data.get("description", {}).get("extension")
+            if not self.description is None and not extension is None:
+                self.description += extension
+            elif self.description is None:
+                self.description = extension
+
+            misc = data.get("misc", [])
+
+            for elem in misc:
+                if elem.get("body", {}).get("type") == "PML":
+                    pml_content = elem.get("body", {}).get("pml_content", {}).get("component", {}).get("children", [])
+                    for pml_elem in pml_content:
+                        text = pml_elem.get("markdown")
+                        if not text is None and "Leverancier" in text:
+                            if not self.brand_description is None:
+                                self.brand_description += text
+                            else:
+                                self.brand_description = text
 
             return self
 
