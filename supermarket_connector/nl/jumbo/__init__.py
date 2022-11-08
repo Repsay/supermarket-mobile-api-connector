@@ -44,13 +44,13 @@ class Client:
             try:
                 if new_proxy:
                     new_proxy = False
-                    self.__proxy = FreeProxy().get()
+                    self.__proxy = FreeProxy().get() # type: ignore
 
                 counter_tries += 1
-                response: Response = requests.request(method, f"{self.BASE_URL}{end_point}", params=params, headers=headers, timeout=timeout, proxies={"http": self.__proxy})
+                response: Response = requests.request(method, f"{self.BASE_URL}{end_point}", params=params, headers=headers, timeout=timeout, proxies={"http": self.__proxy}) # type: ignore
 
                 if not response.ok:
-                    self.__proxy = FreeProxy().get()
+                    self.__proxy = FreeProxy().get() # type: ignore
                     print(f"Connection error: {response.status_code} try: {counter_tries}", end="\r")
                     continue
             except Exception as e:
@@ -123,7 +123,7 @@ class Client:
         self.debug = debug
         self.debug_fn = debug_fn
         self.debug_value = debug_value
-        self.__proxy = FreeProxy().get()
+        self.__proxy = FreeProxy().get() # type: ignore
 
     class Categories:
         def __init__(self, client: Client) -> None:
@@ -277,7 +277,7 @@ class Client:
                     self.price_current = self.price_current / 100
 
                 unit_size: Optional[str] = price_data.get("unitPrice", {}).get("unit")
-                unit_size_price: Optional[Union[int, float]] = price_data.get("unitPrice", {}).get("price", {}).get("amount")
+                unit_size_price: Optional[Union[int, float]] = price_data.get("unitPrice", {}).get("price", {}).get("amount") # type: ignore
                 if not unit_size_price is None:
                     unit_size_price = unit_size_price / 100
 
@@ -332,7 +332,7 @@ class Client:
 
             return self
 
-        def price(self):
+        def price(self) -> Optional[float]: # type: ignore
             if not self.price_current is None:
                 return self.price_current
             else:
@@ -369,7 +369,7 @@ class Client:
             if id is None:
                 raise ValueError("Expected data to have ID")
 
-            if id.isdigit():
+            if not isinstance(id, int) and id.isdigit():
                 id = int(id)
 
             super().__init__(id, slug_name, name, images=[image], subs=[])
