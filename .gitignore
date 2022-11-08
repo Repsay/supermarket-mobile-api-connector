@@ -116,3 +116,10 @@ dmypy.json
 
 # VSCODE
 .vscode/
+
+# Test
+test.py
+debug/
+
+# Install script
+setup.txt
