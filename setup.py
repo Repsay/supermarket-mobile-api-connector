@@ -10,7 +10,7 @@ with open(path.join(HERE, "README.md")) as f:
 setup(
     name="supermarket-connector",
     packages=find_packages(),
-    version="0.0.15",
+    version="0.0.17",
     description="Supermarket Mobile API Connector",
     url="https://github.com/Repsay/supermarket-mobile-api-connector",
     download_url="https://github.com/Repsay/supermarket-mobile-api-connector/releases",
