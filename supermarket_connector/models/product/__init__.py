@@ -187,5 +187,5 @@ class Product(ABC):
     nuts_free: bool = True
 
     @abc.abstractclassmethod
-    def price(self):
+    def price(self) -> Optional[float]:
         pass
