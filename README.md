@@ -17,7 +17,7 @@ ah_categories = ah_client.categories.list()
 
 ah_products_category = ah_client.products.list(ah_categories[1234])
 
-print(ah_products_category_1[20198].details())
+ah_products_category[20198].details()
 
 ```
 
@@ -35,10 +35,18 @@ Supermarket-connector is build for python 3.9+.
 
 ## Current supermarkets connected
 
+Currently it is not possible to connect to Lidl supermarket data due to the fact that they do not have a public api.
+
 * Dutch
   * Albert Heijn
   * Jumbo
   * Picnic
+  * Aldi*
+  * Plus**
+  * Coop**
+
+\* Not all products have a price available <br/>
+\*\* Not all data is available for these supermarkets.
 
 ## Features
 

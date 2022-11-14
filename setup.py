@@ -10,7 +10,7 @@ with open(path.join(HERE, "README.md")) as f:
 setup(
     name="supermarket-connector",
     packages=find_packages(),
-    version="0.0.17",
+    version="0.0.26",
     description="Supermarket Mobile API Connector",
     url="https://github.com/Repsay/supermarket-mobile-api-connector",
     download_url="https://github.com/Repsay/supermarket-mobile-api-connector/releases",
@@ -21,6 +21,7 @@ setup(
     license="MIT",
     python_requires=">=3.8",
     install_requires=["requests", "unidecode", "free-proxy"],
+    package_data={"supermarket_connector": ["nl/plus/auth_data.json"]},
     include_package_data=True,
     classifiers=[
         "Development Status :: 2 - Pre-Alpha",

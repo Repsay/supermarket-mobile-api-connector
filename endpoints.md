@@ -368,3 +368,9 @@ Categories -> https://pls-sprmrkt-mw.prd.vdc1.plus.nl/api/v3/categorytree
 Products -> https://pls-sprmrkt-mw.prd.vdc1.plus.nl/api/v3/navigation?tn_cid=168&tn_ps=1000
 
 Details -> https://pls-sprmrkt-mw.prd.vdc1.plus.nl/api/v3/product/889494
+
+### SPAR
+
+### DIRK
+
+### DEKAMARKT
