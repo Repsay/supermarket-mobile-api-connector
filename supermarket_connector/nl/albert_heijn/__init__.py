@@ -6,10 +6,11 @@ import shutil
 import tempfile
 import typing
 from datetime import date
-from typing import Any, Optional, Union, List, Dict
+from typing import Any, Dict, List, Optional, Union
 
 import requests
 from requests.models import Response
+
 from supermarket_connector import utils
 from supermarket_connector.enums import BonusType, DiscountType, ProductAvailabilityStatus, SegmentType, ShopType
 from supermarket_connector.models.category import Category
@@ -19,6 +20,23 @@ from supermarket_connector.nl.albert_heijn import errors
 
 
 class Client:
+    """Client for Albert Heijn
+
+    Client for Albert Heijn API to get products, categories and images from Albert Heijn. The API is not officially documented and is based on reverse engineering. The API is used by the Albert Heijn app. The API is not stable and can change at any time. The API is not supported by Albert Heijn and can be removed at any time. The API is not tested and can contain bugs. The API is not complete and can be missing features. Use at your own risk.
+
+    Args:
+        debug (bool, optional): Enable debug mode. Defaults to False.
+        debug_fn (str, optional): Filename to save debug data. Defaults to None.
+        debug_value (bool, optional): Save debug data for values. Defaults to False.
+
+
+    Raises:
+        errors.AuthenticationError: Raised when the client is not authenticated
+
+    Returns:
+        Client: Client for Albert Heijn
+    """
+
     BASE_URL = "https://api.ah.nl/"
     DEFAULT_HEADERS = {
         "User-Agent": "android/6.29.3 Model/phone Android/7.0-API24",
@@ -35,6 +53,7 @@ class Client:
     access_token: Optional[str] = None
 
     def get_anonymous_access_token(self) -> Optional[str]:
+
         response = self.request("POST", "mobile-auth/v1/auth/token/anonymous", request_data={"clientId": "appie"}, authorized=False)
 
         if not isinstance(response, dict):
